@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dokshhub - Community Platform</title>
+    <title>Dokshhub-Community</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
@@ -14,7 +14,7 @@
         }
 
         .gradient-bg {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #667eea 0%, #1e023a 100%);
         }
 
         .glass-effect {
@@ -136,7 +136,7 @@
                         <div class="w-8 h-8 bg-gradient-to-r from-purple-500 to-blue-500 rounded-lg flex items-center justify-center">
                             <i class="fas fa-users text-white text-sm"></i>
                         </div>
-                        <h1 class="text-xl font-bold text-gray-800">Dokshhub</h1>
+                        <h1 class="text-xl font-bold text-gray-800">Doksh Hub</h1>
                     </div>
                 </div>
                 <div class="flex items-center space-x-4">
@@ -163,8 +163,8 @@
                 <div class="mx-auto w-16 h-16 bg-white rounded-full flex items-center justify-center mb-4 shadow-lg">
                     <i class="fas fa-users text-purple-600 text-2xl"></i>
                 </div>
-                <h1 class="text-4xl font-bold text-white mb-2">Dokshhub</h1>
-                <p class="text-purple-100">Your exclusive community platform</p>
+                <h1 class="text-4xl font-bold text-white mb-2">Doksh-Hub</h1>
+                <p class="text-purple-100">Doksh Hub Community</p>
             </div>
 
             <!-- Auth Forms -->
@@ -530,7 +530,7 @@
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Description</label>
-                        <input type="text" id="fileDescription" placeholder="Brief description of the file" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+                        <input type="text" id="fileDescription" placeholder="Optional description" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
                     </div>
                     <div class="flex justify-end space-x-4">
                         <button type="button" id="cancelFileUpload" class="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
@@ -546,8 +546,8 @@
     </div>
 
     <script>
-        // Global variables
-        let currentUser = null;
+        // Data storage
+        let currentUser = JSON.parse(localStorage.getItem('dokshhub_currentUser')) || null;
         let users = JSON.parse(localStorage.getItem('dokshhub_users') || '[]');
         let announcements = JSON.parse(localStorage.getItem('dokshhub_announcements') || '[]');
         let chatMessages = JSON.parse(localStorage.getItem('dokshhub_chat') || '[]');
@@ -571,6 +571,38 @@
             localStorage.setItem('dokshhub_users', JSON.stringify(users));
         }
 
+        // Check for logged-in user on page load
+        function initializePage() {
+            currentUser = JSON.parse(localStorage.getItem('dokshhub_currentUser')) || null;
+            console.log('Initializing page, currentUser:', currentUser);
+
+            if (currentUser) {
+                // Verify the user still exists in the users array and is valid
+                const user = users.find(u => u.id === currentUser.id && u.email.toLowerCase() === currentUser.email.toLowerCase());
+                if (user && user.status === 'approved') {
+                    currentUser = user; // Sync with latest user data
+                    currentUser.isOnline = true;
+                    updateUser(currentUser);
+                    localStorage.setItem('dokshhub_currentUser', JSON.stringify(currentUser));
+                    console.log('User is approved, showing dashboard');
+                    showDashboard();
+                } else if (user && user.status === 'pending') {
+                    currentUser = user;
+                    console.log('User is pending, showing pending screen');
+                    showPendingScreen();
+                } else {
+                    // User no longer exists or is invalid, clear session
+                    console.warn('Invalid or deleted user, clearing session');
+                    localStorage.removeItem('dokshhub_currentUser');
+                    currentUser = null;
+                    showAuthContainer();
+                }
+            } else {
+                console.log('No currentUser found, showing auth container');
+                showAuthContainer();
+            }
+        }
+
         // Auth functions
         function showSignup() {
             document.getElementById('loginForm').classList.add('hidden');
@@ -582,21 +614,36 @@
             document.getElementById('loginForm').classList.remove('hidden');
         }
 
+        function showAuthContainer() {
+            document.getElementById('authContainer').classList.remove('hidden');
+            document.getElementById('pendingScreen').classList.add('hidden');
+            document.getElementById('dashboard').classList.add('hidden');
+            document.getElementById('navbar').classList.add('hidden');
+        }
+
         function login(email, password) {
-            const user = users.find(u => u.email === email && u.password === password);
+            // Normalize email to lowercase for case-insensitive comparison
+            email = email.toLowerCase().trim();
+            
+            // Find user in the users array
+            const user = users.find(u => u.email.toLowerCase() === email && u.password === password);
             
             if (!user) {
-                alert('Invalid email or password');
+                console.error('Login failed: Invalid email or password');
+                alert('Invalid email or password. Please check your credentials and try again.');
                 return;
             }
 
             if (user.status === 'banned') {
+                console.error('Login failed: Account is banned');
                 alert('Your account has been banned. Please contact an administrator.');
                 return;
             }
 
             if (user.status === 'pending') {
                 currentUser = user;
+                localStorage.setItem('dokshhub_currentUser', JSON.stringify(currentUser));
+                console.log('Login: User is pending, showing pending screen');
                 showPendingScreen();
                 return;
             }
@@ -605,22 +652,27 @@
                 currentUser = user;
                 currentUser.isOnline = true;
                 updateUser(currentUser);
+                localStorage.setItem('dokshhub_currentUser', JSON.stringify(currentUser));
+                console.log('Login successful: Showing dashboard for', currentUser.name);
                 showDashboard();
                 return;
             }
 
+            console.error('Login failed: Unknown account status');
             alert('Account status unknown. Please contact an administrator.');
         }
 
         function signup(name, email, password) {
-            if (users.find(u => u.email === email)) {
-                alert('An account with this email already exists');
+            email = email.toLowerCase().trim();
+            if (users.find(u => u.email.toLowerCase() === email)) {
+                console.error('Signup failed: Email already exists', email);
+                alert('An account with this email already exists.');
                 return;
             }
 
             const newUser = {
                 id: Date.now(),
-                name: name,
+                name: name.trim(),
                 email: email,
                 password: password,
                 role: 'member',
@@ -630,23 +682,27 @@
             };
 
             users.push(newUser);
-            localStorage.setItem('dokshhub_users', JSON.stringify(users));
-            
-            currentUser = newUser;
-            showPendingScreen();
+            try {
+                localStorage.setItem('dokshhub_users', JSON.stringify(users));
+                currentUser = newUser;
+                localStorage.setItem('dokshhub_currentUser', JSON.stringify(currentUser));
+                console.log('Signup successful, user pending:', newUser);
+                showPendingScreen();
+            } catch (e) {
+                console.error('Failed to save signup data to localStorage:', e);
+                alert('Error creating account. Please try again.');
+            }
         }
 
         function logout() {
             if (currentUser) {
                 currentUser.isOnline = false;
                 updateUser(currentUser);
+                localStorage.removeItem('dokshhub_currentUser');
             }
             currentUser = null;
             
-            document.getElementById('authContainer').classList.remove('hidden');
-            document.getElementById('pendingScreen').classList.add('hidden');
-            document.getElementById('dashboard').classList.add('hidden');
-            document.getElementById('navbar').classList.add('hidden');
+            showAuthContainer();
             
             // Reset forms
             document.getElementById('loginFormElement').reset();
@@ -673,7 +729,13 @@
             const index = users.findIndex(u => u.id === user.id);
             if (index !== -1) {
                 users[index] = user;
-                localStorage.setItem('dokshhub_users', JSON.stringify(users));
+                try {
+                    localStorage.setItem('dokshhub_users', JSON.stringify(users));
+                    console.log('User updated and saved to localStorage:', user);
+                } catch (e) {
+                    console.error('Failed to save users to localStorage:', e);
+                    alert('Error saving user data. Please try again.');
+                }
             }
         }
 
@@ -1301,6 +1363,11 @@
             if (user) {
                 user.status = 'approved';
                 updateUser(user);
+                if (user.id === currentUser.id) {
+                    currentUser = user;
+                    localStorage.setItem('dokshhub_currentUser', JSON.stringify(currentUser));
+                    showDashboard();
+                }
                 updateAdminStats();
                 loadPendingApprovals();
                 loadManageMembers();
@@ -1314,11 +1381,19 @@
             }
             
             if (confirm('Are you sure you want to reject this user? This action cannot be undone.')) {
+                const user = users.find(u => u.id === userId);
+                if (user && user.id === currentUser.id) {
+                    localStorage.removeItem('dokshhub_currentUser');
+                    currentUser = null;
+                }
                 users = users.filter(u => u.id !== userId);
                 localStorage.setItem('dokshhub_users', JSON.stringify(users));
                 updateAdminStats();
                 loadPendingApprovals();
                 loadManageMembers();
+                if (!currentUser) {
+                    showAuthContainer();
+                }
             }
         }
 
@@ -1339,6 +1414,11 @@
                     user.status = 'banned';
                     user.isOnline = false;
                     updateUser(user);
+                    if (user.id === currentUser.id) {
+                        localStorage.removeItem('dokshhub_currentUser');
+                        currentUser = null;
+                        showAuthContainer();
+                    }
                     updateAdminStats();
                     loadManageMembers();
                 }
@@ -1396,6 +1476,9 @@
 
         // Event listeners
         document.addEventListener('DOMContentLoaded', function() {
+            // Initialize page based on currentUser
+            initializePage();
+
             // Auth form toggles
             document.getElementById('showSignup').addEventListener('click', showSignup);
             document.getElementById('showLogin').addEventListener('click', showLogin);
@@ -1547,8 +1630,6 @@
                 }
             });
         });
-
-        // No default announcements or files
     </script>
 </body>
 </html>
