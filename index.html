@@ -1,0 +1,1554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dokshhub - Community Platform</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        * {
+            font-family: 'Inter', sans-serif;
+        }
+
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .glass-effect {
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .chat-container {
+            height: 400px;
+            overflow-y: auto;
+        }
+
+        .chat-message {
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .notification-badge {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        .member-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+        }
+
+        .file-item:hover {
+            background: rgba(103, 126, 234, 0.1);
+            transition: all 0.2s ease;
+        }
+
+        .status-online {
+            background: #10b981;
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+        }
+
+        .status-offline {
+            background: #6b7280;
+        }
+
+        .status-pending {
+            background: #f59e0b;
+            box-shadow: 0 0 10px rgba(245, 158, 11, 0.5);
+        }
+
+        .sidebar-item:hover {
+            background: rgba(103, 126, 234, 0.1);
+            border-radius: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .admin-badge {
+            background: linear-gradient(45deg, #ffd700, #ff8c00);
+            color: #000;
+            font-weight: 600;
+        }
+
+        .announcement-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .loading-spinner {
+            border: 3px solid #f3f4f6;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .mention {
+            color: #3b82f6;
+            font-weight: 600;
+        }
+
+        .chat-image {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            margin-top: 8px;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Navigation -->
+    <nav id="navbar" class="bg-white shadow-lg border-b border-gray-200 hidden">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center space-x-4">
+                    <button id="menuToggle" class="md:hidden p-2 text-gray-600 hover:text-gray-800">
+                        <i class="fas fa-bars text-lg"></i>
+                    </button>
+                    <div class="flex items-center space-x-2">
+                        <div class="w-8 h-8 bg-gradient-to-r from-purple-500 to-blue-500 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-users text-white text-sm"></i>
+                        </div>
+                        <h1 class="text-xl font-bold text-gray-800">Dokshhub</h1>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span id="userWelcome" class="text-gray-600"></span>
+                    <div class="relative">
+                        <button id="notificationBtn" class="relative p-2 text-gray-600 hover:text-gray-800">
+                            <i class="fas fa-bell text-lg"></i>
+                            <span id="notificationBadge" class="notification-badge absolute -top-1 -right-1 w-5 h-5 rounded-full text-white text-xs flex items-center justify-center hidden">0</span>
+                        </button>
+                    </div>
+                    <button id="logoutBtn" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition duration-200">
+                        <i class="fas fa-sign-out-alt mr-2"></i>Logout
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Login/Signup Form -->
+    <div id="authContainer" class="min-h-screen gradient-bg flex items-center justify-center p-4">
+        <div class="max-w-md w-full">
+            <!-- Welcome Section -->
+            <div class="text-center mb-8">
+                <div class="mx-auto w-16 h-16 bg-white rounded-full flex items-center justify-center mb-4 shadow-lg">
+                    <i class="fas fa-users text-purple-600 text-2xl"></i>
+                </div>
+                <h1 class="text-4xl font-bold text-white mb-2">Dokshhub</h1>
+                <p class="text-purple-100">Your exclusive community platform</p>
+            </div>
+
+            <!-- Auth Forms -->
+            <div class="glass-effect rounded-2xl p-8 shadow-2xl">
+                <!-- Login Form -->
+                <div id="loginForm">
+                    <h2 class="text-2xl font-bold text-white mb-6 text-center">Welcome Back</h2>
+                    <form id="loginFormElement" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-purple-100 mb-2">Email</label>
+                            <input type="email" id="loginEmail" required class="w-full px-4 py-3 rounded-lg bg-white/20 border border-white/30 text-white placeholder-purple-200 focus:outline-none focus:ring-2 focus:ring-white/50" placeholder="Enter your email">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-purple-100 mb-2">Password</label>
+                            <input type="password" id="loginPassword" required class="w-full px-4 py-3 rounded-lg bg-white/20 border border-white/30 text-white placeholder-purple-200 focus:outline-none focus:ring-2 focus:ring-white/50" placeholder="Enter your password">
+                        </div>
+                        <button type="submit" class="w-full bg-white text-purple-600 font-semibold py-3 rounded-lg hover:bg-purple-50 transition duration-200">
+                            Sign In
+                        </button>
+                    </form>
+                    <p class="text-purple-100 text-center mt-4">
+                        Don't have an account? 
+                        <button id="showSignup" class="text-white font-semibold hover:underline">Sign Up</button>
+                    </p>
+                </div>
+
+                <!-- Signup Form -->
+                <div id="signupForm" class="hidden">
+                    <h2 class="text-2xl font-bold text-white mb-6 text-center">Join Dokshhub</h2>
+                    <form id="signupFormElement" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-purple-100 mb-2">Full Name</label>
+                            <input type="text" id="signupName" required class="w-full px-4 py-3 rounded-lg bg-white/20 border border-white/30 text-white placeholder-purple-200 focus:outline-none focus:ring-2 focus:ring-white/50" placeholder="Enter your full name">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-purple-100 mb-2">Email</label>
+                            <input type="email" id="signupEmail" required class="w-full px-4 py-3 rounded-lg bg-white/20 border border-white/30 text-white placeholder-purple-200 focus:outline-none focus:ring-2 focus:ring-white/50" placeholder="Enter your email">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-purple-100 mb-2">Password</label>
+                            <input type="password" id="signupPassword" required class="w-full px-4 py-3 rounded-lg bg-white/20 border border-white/30 text-white placeholder-purple-200 focus:outline-none focus:ring-2 focus:ring-white/50" placeholder="Create a password">
+                        </div>
+                        <button type="submit" class="w-full bg-white text-purple-600 font-semibold py-3 rounded-lg hover:bg-purple-50 transition duration-200">
+                            Create Account
+                        </button>
+                    </form>
+                    <p class="text-purple-100 text-center mt-4">
+                        Already have an account? 
+                        <button id="showLogin" class="text-white font-semibold hover:underline">Sign In</button>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pending Approval Screen -->
+    <div id="pendingScreen" class="min-h-screen gradient-bg flex items-center justify-center p-4 hidden">
+        <div class="max-w-md w-full text-center">
+            <div class="glass-effect rounded-2xl p-8 shadow-2xl">
+                <div class="mx-auto w-16 h-16 bg-yellow-500 rounded-full flex items-center justify-center mb-6">
+                    <i class="fas fa-clock text-white text-2xl"></i>
+                </div>
+                <h2 class="text-2xl font-bold text-white mb-4">Account Pending Approval</h2>
+                <p class="text-purple-100 mb-6">Your account has been created successfully! Please wait for an administrator to approve your access to the community.</p>
+                <button id="logoutPending" class="bg-white text-purple-600 font-semibold px-6 py-2 rounded-lg hover:bg-purple-50 transition duration-200">
+                    Back to Login
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Dashboard -->
+    <div id="dashboard" class="hidden">
+        <div class="flex h-screen bg-gray-50">
+            <!-- Sidebar -->
+            <div id="sidebar" class="hidden md:block w-64 bg-white shadow-lg border-r border-gray-200 absolute md:relative z-50 h-full overflow-y-auto">
+                <div class="p-6 border-b border-gray-200">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 bg-gradient-to-r from-purple-500 to-blue-500 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-users text-white"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-gray-800">Dokshhub</h2>
+                            <p class="text-sm text-gray-500">Community Hub</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <nav class="p-4 space-y-2">
+                    <button class="sidebar-item w-full text-left px-4 py-3 text-gray-700 hover:bg-purple-50 rounded-lg flex items-center space-x-3" onclick="showSection('members')">
+                        <i class="fas fa-users text-indigo-600"></i>
+                        <span>Doksh members</span>
+                    </button>
+                    <button class="sidebar-item w-full text-left px-4 py-3 text-gray-700 hover:bg-purple-50 rounded-lg flex items-center space-x-3" onclick="showSection('announcements')">
+                        <i class="fas fa-bullhorn text-purple-600"></i>
+                        <span>Announcements</span>
+                    </button>
+                    <button class="sidebar-item w-full text-left px-4 py-3 text-gray-700 hover:bg-purple-50 rounded-lg flex items-center space-x-3" onclick="showSection('chat')">
+                        <i class="fas fa-comments text-blue-600"></i>
+                        <span>Community Chat</span>
+                        <span id="chatNotif" class="notification-badge w-5 h-5 rounded-full text-white text-xs flex items-center justify-center ml-auto hidden">0</span>
+                    </button>
+                    <button class="sidebar-item w-full text-left px-4 py-3 text-gray-700 hover:bg-purple-50 rounded-lg flex items-center space-x-3" onclick="showSection('files')">
+                        <i class="fas fa-folder text-green-600"></i>
+                        <span>Shared Files</span>
+                    </button>
+                    <div id="adminMenu" class="hidden">
+                        <div class="border-t border-gray-200 my-4"></div>
+                        <p class="px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Admin Panel</p>
+                        <button class="sidebar-item w-full text-left px-4 py-3 text-gray-700 hover:bg-red-50 rounded-lg flex items-center space-x-3" onclick="showSection('admin')">
+                            <i class="fas fa-crown text-yellow-600"></i>
+                            <span>Admin Control</span>
+                            <span id="pendingCount" class="notification-badge w-5 h-5 rounded-full text-white text-xs flex items-center justify-center ml-auto hidden">0</span>
+                        </button>
+                    </div>
+                </nav>
+            </div>
+
+            <!-- Main Content -->
+            <div class="flex-1 overflow-hidden">
+                <!-- Announcements Section -->
+                <div id="announcementsSection" class="h-full overflow-y-auto p-6">
+                    <div class="max-w-4xl mx-auto">
+                        <div class="flex justify-between items-center mb-6">
+                            <h1 class="text-3xl font-bold text-gray-800">Community Announcements</h1>
+                            <button id="newAnnouncementBtn" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-medium hidden">
+                                <i class="fas fa-plus mr-2"></i>New Announcement
+                            </button>
+                        </div>
+                        
+                        <div id="announcementsList" class="space-y-4">
+                            <!-- Announcements will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chat Section -->
+                <div id="chatSection" class="h-full flex flex-col hidden">
+                    <div class="border-b border-gray-200 p-6">
+                        <h1 class="text-3xl font-bold text-gray-800">Community Chat</h1>
+                        <p class="text-gray-600">Connect with fellow community members</p>
+                    </div>
+                    
+                    <div class="flex-1 flex flex-col md:flex-row">
+                        <!-- Chat Messages -->
+                        <div class="flex-1 flex flex-col">
+                            <div id="chatMessages" class="chat-container flex-1 p-6 space-y-4 overflow-y-auto">
+                                <!-- Messages will be loaded here -->
+                            </div>
+                            
+                            <!-- Chat Input -->
+                            <div class="border-t border-gray-200 p-4">
+                                <div class="flex space-x-2">
+                                    <input type="text" id="chatInput" placeholder="Type your message..." class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                    <input type="file" id="chatImageInput" accept="image/*" class="hidden">
+                                    <button id="chatImageBtn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-3 rounded-lg">
+                                        <i class="fas fa-image"></i>
+                                    </button>
+                                    <button id="sendChatBtn" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-medium">
+                                        <i class="fas fa-paper-plane"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Online Users -->
+                        <div class="w-full md:w-64 bg-white border-t md:border-t-0 md:border-l border-gray-200 p-4">
+                            <h3 class="font-semibold text-gray-800 mb-4">Online Members</h3>
+                            <div id="onlineUsers" class="space-y-2">
+                                <!-- Online users will be loaded here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Files Section -->
+                <div id="filesSection" class="h-full overflow-y-auto p-6 hidden">
+                    <div class="max-w-4xl mx-auto">
+                        <div class="flex justify-between items-center mb-6">
+                            <h1 class="text-3xl font-bold text-gray-800">Shared Files</h1>
+                            <button id="uploadFileBtn" class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-medium hidden">
+                                <i class="fas fa-upload mr-2"></i>Upload File
+                            </button>
+                        </div>
+                        
+                        <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+                            <div class="p-6">
+                                <div id="filesList" class="space-y-3">
+                                    <!-- Files will be loaded here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Members Section -->
+                <div id="membersSection" class="h-full overflow-y-auto p-6 hidden">
+                    <div class="max-w-4xl mx-auto">
+                        <h1 class="text-3xl font-bold text-gray-800 mb-6">Doksh Members</h1>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="membersList">
+                            <!-- Members will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Admin Section -->
+                <div id="adminSection" class="h-full overflow-y-auto p-6 hidden">
+                    <div class="max-w-6xl mx-auto">
+                        <h1 class="text-3xl font-bold text-gray-800 mb-6">Admin Control Panel</h1>
+                        
+                        <!-- Admin Stats -->
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                                <div class="flex items-center">
+                                    <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                                        <i class="fas fa-users text-blue-600 text-xl"></i>
+                                    </div>
+                                    <div class="ml-4">
+                                        <p class="text-sm text-gray-600">Total Members</p>
+                                        <p id="totalMembers" class="text-2xl font-bold text-gray-800">0</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                                <div class="flex items-center">
+                                    <div class="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
+                                        <i class="fas fa-clock text-yellow-600 text-xl"></i>
+                                    </div>
+                                    <div class="ml-4">
+                                        <p class="text-sm text-gray-600">Pending Approval</p>
+                                        <p id="pendingMembers" class="text-2xl font-bold text-gray-800">0</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                                <div class="flex items-center">
+                                    <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                                        <i class="fas fa-check text-green-600 text-xl"></i>
+                                    </div>
+                                    <div class="ml-4">
+                                        <p class="text-sm text-gray-600">Approved</p>
+                                        <p id="approvedMembers" class="text-2xl font-bold text-gray-800">0</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                                <div class="flex items-center">
+                                    <div class="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
+                                        <i class="fas fa-ban text-red-600 text-xl"></i>
+                                    </div>
+                                    <div class="ml-4">
+                                        <p class="text-sm text-gray-600">Banned</p>
+                                        <p id="bannedMembers" class="text-2xl font-bold text-gray-800">0</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Admin Tabs -->
+                        <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+                            <div class="border-b border-gray-200">
+                                <nav class="flex space-x-8 px-6">
+                                    <button class="admin-tab py-4 text-sm font-medium border-b-2 border-purple-500 text-purple-600" data-tab="pending">
+                                        Pending Approvals
+                                    </button>
+                                    <button class="admin-tab py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-tab="manage">
+                                        Manage Members
+                                    </button>
+                                </nav>
+                            </div>
+                            
+                            <div class="p-6">
+                                <!-- Pending Approvals Tab -->
+                                <div id="pendingTab" class="admin-tab-content">
+                                    <div id="pendingApprovals">
+                                        <!-- Pending users will be loaded here -->
+                                    </div>
+                                </div>
+                                
+                                <!-- Manage Members Tab -->
+                                <div id="manageTab" class="admin-tab-content hidden">
+                                    <div class="mb-6">
+                                        <label class="block text-sm font-medium text-gray-700 mb-2">Assign Role</label>
+                                        <div class="flex space-x-2">
+                                            <input type="text" id="roleUsernameInput" placeholder="Enter username" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                            <select id="roleSelect" class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                                <option value="admin">Admin</option>
+                                                <option value="mod">Mod</option>
+                                                <option value="member">Member</option>
+                                            </select>
+                                            <button onclick="assignRole()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm">
+                                                Assign Role
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="mb-6">
+                                        <label class="block text-sm font-medium text-gray-700 mb-2">Reset User Password</label>
+                                        <div class="flex space-x-2">
+                                            <input type="text" id="resetUsernameInput" placeholder="Enter username" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                            <input type="text" id="newPasswordInput" placeholder="Enter new password" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                            <button onclick="resetUserPassword()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm">
+                                                Reset Password
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div id="manageMembersList">
+                                        <!-- All members management will be loaded here -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <!-- New Announcement Modal -->
+    <div id="announcementModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4">
+            <div class="p-6 border-b border-gray-200">
+                <h3 class="text-lg font-semibold text-gray-800">Create New Announcement</h3>
+            </div>
+            <div class="p-6">
+                <form id="announcementForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Title</label>
+                        <input type="text" id="announcementTitle" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Content</label>
+                        <textarea id="announcementContent" required rows="6" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"></textarea>
+                    </div>
+                    <div class="flex justify-end space-x-4">
+                        <button type="button" id="cancelAnnouncement" class="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+                            Cancel
+                        </button>
+                        <button type="submit" class="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+                            Post Announcement
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- File Upload Modal -->
+    <div id="fileUploadModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div class="p-6 border-b border-gray-200">
+                <h3 class="text-lg font-semibold text-gray-800">Upload File</h3>
+            </div>
+            <div class="p-6">
+                <form id="fileUploadForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">File</label>
+                        <input type="file" id="fileInput" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                        <input type="text" id="fileDescription" placeholder="Brief description of the file" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+                    </div>
+                    <div class="flex justify-end space-x-4">
+                        <button type="button" id="cancelFileUpload" class="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+                            Cancel
+                        </button>
+                        <button type="submit" class="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                            Upload File
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let currentUser = null;
+        let users = JSON.parse(localStorage.getItem('dokshhub_users') || '[]');
+        let announcements = JSON.parse(localStorage.getItem('dokshhub_announcements') || '[]');
+        let chatMessages = JSON.parse(localStorage.getItem('dokshhub_chat') || '[]');
+        let files = JSON.parse(localStorage.getItem('dokshhub_files') || '[]');
+        let currentSection = 'announcements';
+        const adminEmail = 'Nashar1@dokshhub.com';
+
+        // Initialize default admin user
+        if (!users.some(u => u.email === adminEmail)) {
+            users = users.filter(u => u.role !== 'owner'); // Remove any existing owners
+            users.push({
+                id: 1,
+                name: 'doksh',
+                email: adminEmail,
+                password: '11221',
+                role: 'owner',
+                status: 'approved',
+                joinDate: new Date().toISOString(),
+                isOnline: false
+            });
+            localStorage.setItem('dokshhub_users', JSON.stringify(users));
+        }
+
+        // Auth functions
+        function showSignup() {
+            document.getElementById('loginForm').classList.add('hidden');
+            document.getElementById('signupForm').classList.remove('hidden');
+        }
+
+        function showLogin() {
+            document.getElementById('signupForm').classList.add('hidden');
+            document.getElementById('loginForm').classList.remove('hidden');
+        }
+
+        function login(email, password) {
+            const user = users.find(u => u.email === email && u.password === password);
+            
+            if (!user) {
+                alert('Invalid email or password');
+                return;
+            }
+
+            if (user.status === 'banned') {
+                alert('Your account has been banned. Please contact an administrator.');
+                return;
+            }
+
+            if (user.status === 'pending') {
+                currentUser = user;
+                showPendingScreen();
+                return;
+            }
+
+            if (user.status === 'approved') {
+                currentUser = user;
+                currentUser.isOnline = true;
+                updateUser(currentUser);
+                showDashboard();
+                return;
+            }
+
+            alert('Account status unknown. Please contact an administrator.');
+        }
+
+        function signup(name, email, password) {
+            if (users.find(u => u.email === email)) {
+                alert('An account with this email already exists');
+                return;
+            }
+
+            const newUser = {
+                id: Date.now(),
+                name: name,
+                email: email,
+                password: password,
+                role: 'member',
+                status: 'pending',
+                joinDate: new Date().toISOString(),
+                isOnline: false
+            };
+
+            users.push(newUser);
+            localStorage.setItem('dokshhub_users', JSON.stringify(users));
+            
+            currentUser = newUser;
+            showPendingScreen();
+        }
+
+        function logout() {
+            if (currentUser) {
+                currentUser.isOnline = false;
+                updateUser(currentUser);
+            }
+            currentUser = null;
+            
+            document.getElementById('authContainer').classList.remove('hidden');
+            document.getElementById('pendingScreen').classList.add('hidden');
+            document.getElementById('dashboard').classList.add('hidden');
+            document.getElementById('navbar').classList.add('hidden');
+            
+            // Reset forms
+            document.getElementById('loginFormElement').reset();
+            document.getElementById('signupFormElement').reset();
+        }
+
+        function showPendingScreen() {
+            document.getElementById('authContainer').classList.add('hidden');
+            document.getElementById('pendingScreen').classList.remove('hidden');
+            document.getElementById('dashboard').classList.add('hidden');
+            document.getElementById('navbar').classList.add('hidden');
+        }
+
+        function showDashboard() {
+            document.getElementById('authContainer').classList.add('hidden');
+            document.getElementById('pendingScreen').classList.add('hidden');
+            document.getElementById('dashboard').classList.remove('hidden');
+            document.getElementById('navbar').classList.remove('hidden');
+            
+            initializeDashboard();
+        }
+
+        function updateUser(user) {
+            const index = users.findIndex(u => u.id === user.id);
+            if (index !== -1) {
+                users[index] = user;
+                localStorage.setItem('dokshhub_users', JSON.stringify(users));
+            }
+        }
+
+        // Dashboard functions
+        function initializeDashboard() {
+            document.getElementById('userWelcome').textContent = `Welcome, ${currentUser.name}`;
+            
+            // Show admin menu and controls based on role
+            if (['owner', 'admin', 'mod'].includes(currentUser.role)) {
+                document.getElementById('newAnnouncementBtn').classList.remove('hidden');
+            }
+            if (['owner', 'admin'].includes(currentUser.role)) {
+                document.getElementById('uploadFileBtn').classList.remove('hidden');
+            }
+            if (currentUser.role === 'owner' || currentUser.role === 'admin') {
+                document.getElementById('adminMenu').classList.remove('hidden');
+            } else {
+                document.getElementById('adminMenu').classList.add('hidden');
+            }
+            
+            loadContent();
+            updateAdminStats();
+            startChatPolling();
+        }
+
+        function showSection(section) {
+            // Hide all sections
+            document.querySelectorAll('[id$="Section"]').forEach(el => {
+                el.classList.add('hidden');
+            });
+            
+            // Show selected section if user has permission
+            if (section === 'admin' && !['owner', 'admin'].includes(currentUser.role)) {
+                alert('Access denied: Admin section is restricted to owners and admins only.');
+                return;
+            }
+            
+            document.getElementById(section + 'Section').classList.remove('hidden');
+            currentSection = section;
+            
+            // Update sidebar active state
+            document.querySelectorAll('.sidebar-item').forEach(item => {
+                item.classList.remove('bg-purple-100', 'text-purple-700');
+                if (item.querySelector('span').textContent.toLowerCase().includes(section)) {
+                    item.classList.add('bg-purple-100', 'text-purple-700');
+                }
+            });
+            
+            loadContent();
+        }
+
+        function loadContent() {
+            switch (currentSection) {
+                case 'announcements':
+                    loadAnnouncements();
+                    break;
+                case 'chat':
+                    loadChat();
+                    loadOnlineUsers();
+                    break;
+                case 'files':
+                    loadFiles();
+                    break;
+                case 'members':
+                    loadMembers();
+                    break;
+                case 'admin':
+                    if (['owner', 'admin'].includes(currentUser.role)) {
+                        loadAdminPanel();
+                    }
+                    break;
+            }
+        }
+
+        // Announcements functions
+        function loadAnnouncements() {
+            const container = document.getElementById('announcementsList');
+            
+            if (announcements.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-12">
+                        <div class="mx-auto w-24 h-24 bg-purple-100 rounded-full flex items-center justify-center mb-4">
+                            <img src="https://storage.googleapis.com/workspace-0f70711f-8b4e-4d94-86f1-2a93ccde5887/image/980bf8d2-1409-4483-91ba-366307dcbdfb.png" alt="Empty announcement board with megaphone icon in purple and white minimalist style" />
+                        </div>
+                        <h3 class="text-lg font-medium text-gray-800 mb-2">No announcements yet</h3>
+                        <p class="text-gray-600">Check back later for community updates!</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = announcements.map(announcement => `
+                <div class="announcement-card rounded-lg p-6 shadow-lg">
+                    <div class="flex items-start justify-between mb-4">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
+                                <i class="fas fa-bullhorn text-white"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-semibold text-white text-lg">${announcement.title}</h3>
+                                <p class="text-purple-100 text-sm">By ${announcement.author} • ${formatDate(announcement.date)}</p>
+                            </div>
+                        </div>
+                        ${['owner', 'admin'].includes(currentUser.role) ? `
+                            <button onclick="deleteAnnouncement(${announcement.id})" class="text-white/70 hover:text-white">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        ` : ''}
+                    </div>
+                    <div class="text-white/90 leading-relaxed">${announcement.content}</div>
+                </div>
+            `).join('');
+        }
+
+        function createAnnouncement(title, content) {
+            if (!['owner', 'admin', 'mod'].includes(currentUser.role)) {
+                alert('Only owners, admins and mods can create announcements.');
+                return;
+            }
+            
+            const announcement = {
+                id: Date.now(),
+                title: title,
+                content: content,
+                author: currentUser.name,
+                date: new Date().toISOString()
+            };
+
+            announcements.unshift(announcement);
+            localStorage.setItem('dokshhub_announcements', JSON.stringify(announcements));
+            loadAnnouncements();
+        }
+
+        function deleteAnnouncement(id) {
+            if (!['owner', 'admin'].includes(currentUser.role)) {
+                alert('Only owners and admins can delete announcements.');
+                return;
+            }
+            
+            if (confirm('Are you sure you want to delete this announcement?')) {
+                announcements = announcements.filter(a => a.id !== id);
+                localStorage.setItem('dokshhub_announcements', JSON.stringify(announcements));
+                loadAnnouncements();
+            }
+        }
+
+        // Chat functions
+        function loadChat() {
+            const container = document.getElementById('chatMessages');
+            
+            if (chatMessages.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-12">
+                        <div class="mx-auto w-24 h-24 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+                            <img src="https://storage.googleapis.com/workspace-0f70711f-8b4e-4d94-86f1-2a93ccde5887/image/e4cf7366-0840-447e-b482-46a4c8ce631f.png" alt="Empty chat room with speech bubble icons in blue and white minimalist design" />
+                        </div>
+                        <h3 class="text-lg font-medium text-gray-800 mb-2">Start the conversation!</h3>
+                        <p class="text-gray-600">Be the first to send a message to the community.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = chatMessages.map(message => `
+                <div class="chat-message flex items-start space-x-3 ${message.userId === currentUser.id ? 'flex-row-reverse space-x-reverse' : ''}">
+                    <div class="w-8 h-8 ${message.userId === currentUser.id ? 'bg-purple-500' : 'bg-blue-500'} rounded-full flex items-center justify-center">
+                        <span class="text-white text-xs font-semibold">${message.author.charAt(0).toUpperCase()}</span>
+                    </div>
+                    <div class="flex-1 max-w-xs lg:max-w-md">
+                        <div class="${message.userId === currentUser.id ? 'bg-purple-500 text-white' : 'bg-white border border-gray-200'} rounded-lg p-3">
+                            <p class="text-sm font-medium ${message.userId === currentUser.id ? 'text-purple-100' : 'text-gray-700'} mb-1">${message.author}</p>
+                            <div class="${message.userId === currentUser.id ? 'text-white' : 'text-gray-800'}" style="word-break: break-word;">${message.content}</div>
+                            ${message.image ? `<img src="${message.image}" alt="Chat image" class="chat-image">` : ''}
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1 ${message.userId === currentUser.id ? 'text-right' : ''}">${formatTime(message.timestamp)}
+                            ${['owner', 'admin'].includes(currentUser.role) ? ` <button onclick="deleteChatMessage(${message.id})" class="text-red-500 hover:text-red-700 ml-2"><i class="fas fa-trash"></i></button>` : ''}
+                        </p>
+                    </div>
+                </div>
+            `).join('');
+            
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function loadOnlineUsers() {
+            const container = document.getElementById('onlineUsers');
+            const onlineUsers = users.filter(u => u.isOnline && u.status === 'approved');
+            
+            container.innerHTML = onlineUsers.map(user => `
+                <div class="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-50">
+                    <div class="relative">
+                        <div class="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
+                            <span class="text-white text-xs font-semibold">${user.name.charAt(0).toUpperCase()}</span>
+                        </div>
+                        <div class="status-online absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-white"></div>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium text-gray-800 truncate">${user.name}</p>
+                        ${user.role === 'owner' ? '<span class="admin-badge text-xs px-2 py-1 rounded-full bg-yellow-200 text-yellow-800">Owner</span>' : user.role === 'admin' ? '<span class="admin-badge text-xs px-2 py-1 rounded-full">Admin</span>' : user.role === 'mod' ? '<span class="admin-badge text-xs px-2 py-1 rounded-full bg-blue-200 text-blue-800">Mod</span>' : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function processMentions(content) {
+            return content.replace(/@(\w+)/g, '<span class="mention">@$1</span>');
+        }
+
+        function sendChatMessage(content, imageData = null) {
+            content = processMentions(content);
+            const message = {
+                id: Date.now(),
+                content: content,
+                author: currentUser.name,
+                userId: currentUser.id,
+                timestamp: new Date().toISOString(),
+                image: imageData
+            };
+
+            chatMessages.push(message);
+            localStorage.setItem('dokshhub_chat', JSON.stringify(chatMessages));
+            loadChat();
+        }
+
+        function deleteChatMessage(id) {
+            if (!['owner', 'admin'].includes(currentUser.role)) {
+                alert('Only owners and admins can delete chat messages.');
+                return;
+            }
+            
+            if (confirm('Are you sure you want to delete this message?')) {
+                chatMessages = chatMessages.filter(m => m.id !== id);
+                localStorage.setItem('dokshhub_chat', JSON.stringify(chatMessages));
+                loadChat();
+            }
+        }
+
+        function startChatPolling() {
+            // Simulate real-time updates by checking for new messages every 2 seconds
+            setInterval(() => {
+                if (currentSection === 'chat') {
+                    const stored = JSON.parse(localStorage.getItem('dokshhub_chat') || '[]');
+                    if (stored.length !== chatMessages.length) {
+                        chatMessages = stored;
+                        loadChat();
+                    }
+                }
+            }, 2000);
+        }
+
+        // Files functions
+        function loadFiles() {
+            const container = document.getElementById('filesList');
+            
+            if (files.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-12">
+                        <div class="mx-auto w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                            <img src="https://storage.googleapis.com/workspace-0f70711f-8b4e-4d94-86f1-2a93ccde5887/image/99e46eb1-5aad-4f0f-977f-5e6cf5d207d5.png" alt="Empty file folder icon in green and white minimalist style with document symbols" />
+                        </div>
+                        <h3 class="text-lg font-medium text-gray-800 mb-2">No files shared yet</h3>
+                        <p class="text-gray-600">Files uploaded by administrators will appear here.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = files.map(file => `
+                <div class="file-item flex items-center justify-between p-4 rounded-lg border border-gray-200 hover:border-purple-300 transition-colors">
+                    <div class="flex items-center space-x-4">
+                        <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-file text-green-600 text-lg"></i>
+                        </div>
+                        <div>
+                            <h4 class="font-medium text-gray-800">${file.name}</h4>
+                            <p class="text-sm text-gray-600">${file.description || 'No description'}</p>
+                            <p class="text-xs text-gray-500">Uploaded by ${file.uploader} • ${formatDate(file.uploadDate)}</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button onclick="downloadFile(${file.id})" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm">
+                            <i class="fas fa-download mr-2"></i>Download
+                        </button>
+                        ${['owner', 'admin'].includes(currentUser.role) ? `
+                            <button onclick="deleteFile(${file.id})" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        ` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function uploadFile(fileInput, description) {
+            if (!['owner', 'admin'].includes(currentUser.role)) {
+                alert('Only owners and admins can upload files.');
+                return;
+            }
+            
+            const file = fileInput.files[0];
+            if (!file) return;
+
+            const fileObj = {
+                id: Date.now(),
+                name: file.name,
+                description: description,
+                uploader: currentUser.name,
+                uploadDate: new Date().toISOString(),
+                size: file.size
+            };
+
+            files.push(fileObj);
+            localStorage.setItem('dokshhub_files', JSON.stringify(files));
+            loadFiles();
+        }
+
+        function downloadFile(id) {
+            const file = files.find(f => f.id === id);
+            if (file) {
+                alert(`Downloading ${file.name}...`);
+                // In a real application, this would trigger an actual download
+            }
+        }
+
+        function deleteFile(id) {
+            if (!['owner', 'admin'].includes(currentUser.role)) {
+                alert('Only owners and admins can delete files.');
+                return;
+            }
+            
+            if (confirm('Are you sure you want to delete this file?')) {
+                files = files.filter(f => f.id !== id);
+                localStorage.setItem('dokshhub_files', JSON.stringify(files));
+                loadFiles();
+            }
+        }
+
+        // Members functions
+        function rolePriority(role) {
+            if (role === 'owner') return 0;
+            if (role === 'admin') return 1;
+            if (role === 'mod') return 2;
+            return 3;
+        }
+
+        function loadMembers() {
+            const container = document.getElementById('membersList');
+            let approvedMembers = users.filter(u => u.status === 'approved');
+            approvedMembers.sort((a, b) => rolePriority(a.role) - rolePriority(b.role));
+            
+            container.innerHTML = approvedMembers.map(member => `
+                <div class="member-card bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                    <div class="flex items-center space-x-4 mb-4">
+                        <div class="relative">
+                            <div class="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
+                                <span class="text-white font-semibold">${member.name.charAt(0).toUpperCase()}</span>
+                            </div>
+                            <div class="${member.isOnline ? 'status-online' : 'status-offline'} absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white"></div>
+                        </div>
+                        <div class="flex-1">
+                            <h3 class="font-semibold text-gray-800">${member.name}</h3>
+                            <p class="text-sm text-gray-600">${member.email}</p>
+                            <span class="text-xs px-2 py-1 rounded-full mt-1 inline-block ${member.role === 'owner' ? 'bg-yellow-200 text-yellow-800' : member.role === 'admin' ? 'admin-badge' : member.role === 'mod' ? 'bg-blue-200 text-blue-800' : 'bg-gray-200 text-gray-800'}">${member.role.charAt(0).toUpperCase() + member.role.slice(1)}</span>
+                        </div>
+                    </div>
+                    <div class="border-t border-gray-200 pt-4">
+                        <div class="flex justify-between text-sm text-gray-600">
+                            <span>Joined: ${formatDate(member.joinDate)}</span>
+                            <span class="${member.isOnline ? 'text-green-600' : 'text-gray-500'}">${member.isOnline ? 'Online' : 'Offline'}</span>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Admin functions
+        function loadAdminPanel() {
+            if (!['owner', 'admin'].includes(currentUser.role)) {
+                alert('Access denied: Admin panel is restricted to owners and admins only.');
+                document.getElementById('adminSection').classList.add('hidden');
+                return;
+            }
+            
+            updateAdminStats();
+            loadPendingApprovals();
+            loadManageMembers();
+        }
+
+        function updateAdminStats() {
+            const total = users.length;
+            const pending = users.filter(u => u.status === 'pending').length;
+            const approved = users.filter(u => u.status === 'approved').length;
+            const banned = users.filter(u => u.status === 'banned').length;
+
+            document.getElementById('totalMembers').textContent = total;
+            document.getElementById('pendingMembers').textContent = pending;
+            document.getElementById('approvedMembers').textContent = approved;
+            document.getElementById('bannedMembers').textContent = banned;
+
+            // Update notification badges
+            const pendingBadge = document.getElementById('pendingCount');
+            if (pending > 0) {
+                pendingBadge.textContent = pending;
+                pendingBadge.classList.remove('hidden');
+            } else {
+                pendingBadge.classList.add('hidden');
+            }
+        }
+
+        function loadPendingApprovals() {
+            const container = document.getElementById('pendingApprovals');
+            const pendingUsers = users.filter(u => u.status === 'pending');
+            
+            if (pendingUsers.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-12">
+                        <div class="mx-auto w-24 h-24 bg-yellow-100 rounded-full flex items-center justify-center mb-4">
+                            <img src="https://storage.googleapis.com/workspace-0f70711f-8b4e-4d94-86f1-2a93ccde5887/image/ddc195c0-bae9-4989-86bf-b9921bf33059.png" alt="Empty pending approval queue with clock and user icons in yellow and white design" />
+                        </div>
+                        <h3 class="text-lg font-medium text-gray-800 mb-2">No pending approvals</h3>
+                        <p class="text-gray-600">All new members have been processed.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = pendingUsers.map(user => `
+                <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg mb-4">
+                    <div class="flex items-center space-x-4">
+                        <div class="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center">
+                            <span class="text-yellow-600 font-semibold">${user.name.charAt(0).toUpperCase()}</span>
+                        </div>
+                        <div>
+                            <h4 class="font-medium text-gray-800">${user.name}</h4>
+                            <p class="text-sm text-gray-600">${user.email}</p>
+                            <p class="text-xs text-gray-500">Requested: ${formatDate(user.joinDate)}</p>
+                        </div>
+                    </div>
+                    <div class="flex space-x-2">
+                        <button onclick="approveUser(${user.id})" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm">
+                            <i class="fas fa-check mr-2"></i>Approve
+                        </button>
+                        <button onclick="rejectUser(${user.id})" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm">
+                            <i class="fas fa-times mr-2"></i>Reject
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function loadManageMembers() {
+            const container = document.getElementById('manageMembersList');
+            const allMembers = users.filter(u => u.id !== currentUser.id); // Exclude current user
+            
+            container.innerHTML = allMembers.map(user => `
+                <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg mb-4">
+                    <div class="flex items-center space-x-4">
+                        <div class="w-12 h-12 ${getStatusColor(user.status)} rounded-full flex items-center justify-center">
+                            <span class="text-white font-semibold">${user.name.charAt(0).toUpperCase()}</span>
+                        </div>
+                        <div>
+                            <h4 class="font-medium text-gray-800">${user.name}</h4>
+                            <p class="text-sm text-gray-600">${user.email}</p>
+                            <div class="flex items-center space-x-2 mt-1">
+                                <span class="text-xs px-2 py-1 rounded-full ${getStatusBadgeClass(user.status)}">${user.status.toUpperCase()}</span>
+                                <span class="text-xs px-2 py-1 rounded-full ${user.role === 'owner' ? 'bg-yellow-200 text-yellow-800' : user.role === 'admin' ? 'admin-badge' : user.role === 'mod' ? 'bg-blue-200 text-blue-800' : 'bg-gray-200 text-gray-800'}">${user.role.toUpperCase()}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex space-x-2">
+                        ${user.status === 'approved' && currentUser.role === 'owner' && user.role !== 'owner' ? `
+                            <select onchange="assignRoleToUser(${user.id}, this.value)" class="px-4 py-2 border border-gray-300 rounded-lg">
+                                <option value="">Grant Role</option>
+                                <option value="admin">Admin</option>
+                                <option value="mod">Mod</option>
+                                <option value="member">Member</option>
+                            </select>
+                        ` : ''}
+                        ${user.status === 'approved' ? `
+                            <button onclick="banUser(${user.id})" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm">
+                                <i class="fas fa-ban mr-2"></i>Ban
+                            </button>
+                        ` : user.status === 'banned' ? `
+                            <button onclick="unbanUser(${user.id})" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm">
+                                <i class="fas fa-check mr-2"></i>Unban
+                            </button>
+                        ` : ''}
+                        <button onclick="removeUser(${user.id})" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-sm">
+                            <i class="fas fa-trash-alt mr-2"></i>Remove
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function assignRoleToUser(userId, role) {
+            if (currentUser.role !== 'owner') {
+                alert('Only owners can assign roles.');
+                return;
+            }
+            
+            if (role === '') return;
+            
+            const user = users.find(u => u.id === userId);
+            if (user) {
+                if (confirm(`Are you sure you want to assign ${role} role to ${user.name}?`)) {
+                    user.role = role;
+                    updateUser(user);
+                    loadManageMembers();
+                    loadMembers();
+                }
+            }
+        }
+
+        function assignRole() {
+            if (currentUser.role !== 'owner') {
+                alert('Only owners can assign roles.');
+                return;
+            }
+            
+            const username = document.getElementById('roleUsernameInput').value.trim();
+            const role = document.getElementById('roleSelect').value;
+            
+            if (!username || !role) {
+                alert('Please enter a username and select a role.');
+                return;
+            }
+            
+            const user = users.find(u => u.name.toLowerCase() === username.toLowerCase());
+            
+            if (!user) {
+                alert('User not found.');
+                return;
+            }
+            
+            if (user.status !== 'approved') {
+                alert('Only approved members can be assigned roles.');
+                return;
+            }
+            
+            if (confirm(`Are you sure you want to assign ${role} role to ${user.name}?`)) {
+                user.role = role;
+                updateUser(user);
+                document.getElementById('roleUsernameInput').value = '';
+                loadManageMembers();
+                loadMembers();
+            }
+        }
+
+        function resetUserPassword() {
+            if (!['owner', 'admin'].includes(currentUser.role)) {
+                alert('Only owners and admins can reset passwords.');
+                return;
+            }
+            
+            const username = document.getElementById('resetUsernameInput').value.trim();
+            const newPassword = document.getElementById('newPasswordInput').value.trim();
+            
+            if (!username || !newPassword) {
+                alert('Please enter both a username and a new password.');
+                return;
+            }
+            
+            const user = users.find(u => u.name.toLowerCase() === username.toLowerCase());
+            
+            if (!user) {
+                alert('User not found.');
+                return;
+            }
+            
+            if (user.id === currentUser.id) {
+                alert('You cannot reset your own password through this panel.');
+                return;
+            }
+            
+            if (confirm(`Are you sure you want to reset the password for ${user.name}?`)) {
+                user.password = newPassword;
+                updateUser(user);
+                document.getElementById('resetUsernameInput').value = '';
+                document.getElementById('newPasswordInput').value = '';
+                alert(`Password for ${user.name} has been reset to: ${newPassword}`);
+                loadManageMembers();
+            }
+        }
+
+        function removeUser(userId) {
+            if (!['owner', 'admin'].includes(currentUser.role)) {
+                alert('Only owners and admins can remove accounts.');
+                return;
+            }
+            
+            const user = users.find(u => u.id === userId);
+            if (!user) {
+                alert('User not found.');
+                return;
+            }
+            
+            if (user.email === adminEmail) {
+                alert('The main owner account cannot be removed.');
+                return;
+            }
+            
+            if (user.id === currentUser.id) {
+                alert('You cannot remove your own account.');
+                return;
+            }
+            
+            if (confirm(`Are you sure you want to permanently remove ${user.name}'s account? This action cannot be undone.`)) {
+                users = users.filter(u => u.id !== userId);
+                localStorage.setItem('dokshhub_users', JSON.stringify(users));
+                updateAdminStats();
+                loadPendingApprovals();
+                loadManageMembers();
+                loadMembers();
+            }
+        }
+
+        function approveUser(userId) {
+            if (!['owner', 'admin'].includes(currentUser.role)) {
+                alert('Only owners and admins can approve users.');
+                return;
+            }
+            
+            const user = users.find(u => u.id === userId);
+            if (user) {
+                user.status = 'approved';
+                updateUser(user);
+                updateAdminStats();
+                loadPendingApprovals();
+                loadManageMembers();
+            }
+        }
+
+        function rejectUser(userId) {
+            if (!['owner', 'admin'].includes(currentUser.role)) {
+                alert('Only owners and admins can reject users.');
+                return;
+            }
+            
+            if (confirm('Are you sure you want to reject this user? This action cannot be undone.')) {
+                users = users.filter(u => u.id !== userId);
+                localStorage.setItem('dokshhub_users', JSON.stringify(users));
+                updateAdminStats();
+                loadPendingApprovals();
+                loadManageMembers();
+            }
+        }
+
+        function banUser(userId) {
+            if (!['owner', 'admin'].includes(currentUser.role)) {
+                alert('Only owners and admins can ban users.');
+                return;
+            }
+            
+            const user = users.find(u => u.id === userId);
+            if (user && user.email === adminEmail) {
+                alert('The main owner account cannot be banned.');
+                return;
+            }
+            
+            if (confirm('Are you sure you want to ban this user?')) {
+                if (user) {
+                    user.status = 'banned';
+                    user.isOnline = false;
+                    updateUser(user);
+                    updateAdminStats();
+                    loadManageMembers();
+                }
+            }
+        }
+
+        function unbanUser(userId) {
+            if (!['owner', 'admin'].includes(currentUser.role)) {
+                alert('Only owners and admins can unban users.');
+                return;
+            }
+            
+            const user = users.find(u => u.id === userId);
+            if (user) {
+                user.status = 'approved';
+                updateUser(user);
+                updateAdminStats();
+                loadManageMembers();
+            }
+        }
+
+        // Utility functions
+        function formatDate(dateString) {
+            return new Date(dateString).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+            });
+        }
+
+        function formatTime(dateString) {
+            return new Date(dateString).toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        function getStatusColor(status) {
+            switch (status) {
+                case 'approved': return 'bg-green-500';
+                case 'pending': return 'bg-yellow-500';
+                case 'banned': return 'bg-red-500';
+                default: return 'bg-gray-500';
+            }
+        }
+
+        function getStatusBadgeClass(status) {
+            switch (status) {
+                case 'approved': return 'bg-green-100 text-green-800';
+                case 'pending': return 'bg-yellow-100 text-yellow-800';
+                case 'banned': return 'bg-red-100 text-red-800';
+                default: return 'bg-gray-100 text-gray-800';
+            }
+        }
+
+        // Event listeners
+        document.addEventListener('DOMContentLoaded', function() {
+            // Auth form toggles
+            document.getElementById('showSignup').addEventListener('click', showSignup);
+            document.getElementById('showLogin').addEventListener('click', showLogin);
+
+            // Login form
+            document.getElementById('loginFormElement').addEventListener('submit', function(e) {
+                e.preventDefault();
+                const email = document.getElementById('loginEmail').value;
+                const password = document.getElementById('loginPassword').value;
+                login(email, password);
+            });
+
+            // Signup form
+            document.getElementById('signupFormElement').addEventListener('submit', function(e) {
+                e.preventDefault();
+                const name = document.getElementById('signupName').value;
+                const email = document.getElementById('signupEmail').value;
+                const password = document.getElementById('signupPassword').value;
+                signup(name, email, password);
+            });
+
+            // Logout buttons
+            document.getElementById('logoutBtn').addEventListener('click', logout);
+            document.getElementById('logoutPending').addEventListener('click', logout);
+
+            // Menu toggle for mobile
+            document.getElementById('menuToggle').addEventListener('click', function() {
+                document.getElementById('sidebar').classList.toggle('hidden');
+            });
+
+            // Chat input
+            document.getElementById('chatInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    sendChat();
+                }
+            });
+
+            document.getElementById('sendChatBtn').addEventListener('click', sendChat);
+
+            document.getElementById('chatImageBtn').addEventListener('click', function() {
+                document.getElementById('chatImageInput').click();
+            });
+
+            document.getElementById('chatImageInput').addEventListener('change', sendChat);
+
+            function sendChat() {
+                const input = document.getElementById('chatInput');
+                const content = input.value.trim();
+                const fileInput = document.getElementById('chatImageInput');
+                const file = fileInput.files[0];
+
+                if (content || file) {
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.onload = function(e) {
+                            sendChatMessage(content, e.target.result);
+                            input.value = '';
+                            fileInput.value = '';
+                        };
+                        reader.readAsDataURL(file);
+                    } else {
+                        sendChatMessage(content);
+                        input.value = '';
+                    }
+                }
+            }
+
+            // Admin tabs
+            document.querySelectorAll('.admin-tab').forEach(tab => {
+                tab.addEventListener('click', function() {
+                    if (!['owner', 'admin'].includes(currentUser.role)) {
+                        alert('Access denied: Admin panel is restricted to owners and admins only.');
+                        return;
+                    }
+                    
+                    const tabName = this.dataset.tab;
+                    
+                    // Update tab styles
+                    document.querySelectorAll('.admin-tab').forEach(t => {
+                        t.classList.remove('border-purple-500', 'text-purple-600');
+                        t.classList.add('border-transparent', 'text-gray-500');
+                    });
+                    this.classList.add('border-purple-500', 'text-purple-600');
+                    this.classList.remove('border-transparent', 'text-gray-500');
+                    
+                    // Show/hide tab content
+                    document.querySelectorAll('.admin-tab-content').forEach(content => {
+                        content.classList.add('hidden');
+                    });
+                    document.getElementById(tabName + 'Tab').classList.remove('hidden');
+                });
+            });
+
+            // Modal handlers
+            document.getElementById('newAnnouncementBtn').addEventListener('click', function() {
+                if (!['owner', 'admin', 'mod'].includes(currentUser.role)) {
+                    alert('Only owners, admins and mods can create announcements.');
+                    return;
+                }
+                document.getElementById('announcementModal').classList.remove('hidden');
+            });
+
+            document.getElementById('cancelAnnouncement').addEventListener('click', function() {
+                document.getElementById('announcementModal').classList.add('hidden');
+            });
+
+            document.getElementById('announcementForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                if (!['owner', 'admin', 'mod'].includes(currentUser.role)) {
+                    alert('Only owners, admins and mods can create announcements.');
+                    return;
+                }
+                const title = document.getElementById('announcementTitle').value;
+                const content = document.getElementById('announcementContent').value;
+                createAnnouncement(title, content);
+                document.getElementById('announcementModal').classList.add('hidden');
+                this.reset();
+            });
+
+            document.getElementById('uploadFileBtn').addEventListener('click', function() {
+                if (!['owner', 'admin'].includes(currentUser.role)) {
+                    alert('Only owners and admins can upload files.');
+                    return;
+                }
+                document.getElementById('fileUploadModal').classList.remove('hidden');
+            });
+
+            document.getElementById('cancelFileUpload').addEventListener('click', function() {
+                document.getElementById('fileUploadModal').classList.add('hidden');
+            });
+
+            document.getElementById('fileUploadForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                if (!['owner', 'admin'].includes(currentUser.role)) {
+                    alert('Only owners and admins can upload files.');
+                    return;
+                }
+                const fileInput = document.getElementById('fileInput');
+                const description = document.getElementById('fileDescription').value;
+                uploadFile(fileInput, description);
+                document.getElementById('fileUploadModal').classList.add('hidden');
+                this.reset();
+            });
+
+            // Close modals when clicking outside
+            document.addEventListener('click', function(e) {
+                if (e.target.classList.contains('fixed')) {
+                    e.target.classList.add('hidden');
+                }
+            });
+        });
+
+        // No default announcements or files
+    </script>
+</body>
+</html>
