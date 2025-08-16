@@ -181,10 +181,12 @@
                             <label class="block text-sm font-medium text-purple-100 mb-2">Password</label>
                             <input type="password" id="loginPassword" required class="w-full px-4 py-3 rounded-lg bg-white/20 border border-white/30 text-white placeholder-purple-200 focus:outline-none focus:ring-2 focus:ring-white/50" placeholder="Enter your password">
                         </div>
-                        <button type="submit" class="w-full bg-white text-purple-600 font-semibold py-3 rounded-lg hover:bg-purple-50 transition duration-200">
-                            Sign In
+                        <button type="submit" id="loginButton" class="w-full bg-white text-purple-600 font-semibold py-3 rounded-lg hover:bg-purple-50 transition duration-200 flex items-center justify-center">
+                            <span>Sign In</span>
+                            <span id="loginSpinner" class="loading-spinner ml-2 hidden"></span>
                         </button>
                     </form>
+                    <p id="loginError" class="text-red-300 text-center mt-4 hidden"></p>
                     <p class="text-purple-100 text-center mt-4">
                         Don't have an account? 
                         <button id="showSignup" class="text-white font-semibold hover:underline">Sign Up</button>
@@ -207,10 +209,12 @@
                             <label class="block text-sm font-medium text-purple-100 mb-2">Password</label>
                             <input type="password" id="signupPassword" required class="w-full px-4 py-3 rounded-lg bg-white/20 border border-white/30 text-white placeholder-purple-200 focus:outline-none focus:ring-2 focus:ring-white/50" placeholder="Create a password">
                         </div>
-                        <button type="submit" class="w-full bg-white text-purple-600 font-semibold py-3 rounded-lg hover:bg-purple-50 transition duration-200">
-                            Create Account
+                        <button type="submit" id="signupButton" class="w-full bg-white text-purple-600 font-semibold py-3 rounded-lg hover:bg-purple-50 transition duration-200 flex items-center justify-center">
+                            <span>Create Account</span>
+                            <span id="signupSpinner" class="loading-spinner ml-2 hidden"></span>
                         </button>
                     </form>
+                    <p id="signupError" class="text-red-300 text-center mt-4 hidden"></p>
                     <p class="text-purple-100 text-center mt-4">
                         Already have an account? 
                         <button id="showLogin" class="text-white font-semibold hover:underline">Sign In</button>
@@ -553,7 +557,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database.js"></script>
 
     <script>
-        // Firebase configuration
+        // Firebase configuration - REPLACE WITH YOUR FIREBASE PROJECT DETAILS
         const firebaseConfig = {
             apiKey: "YOUR_API_KEY",
             authDomain: "YOUR_AUTH_DOMAIN",
@@ -561,7 +565,7 @@
             storageBucket: "YOUR_STORAGE_BUCKET",
             messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
             appId: "YOUR_APP_ID",
-            databaseURL: "https://YOUR_DATABASE_NAME.firebaseio.com" // For Realtime Database if using for chat
+            databaseURL: "https://YOUR_DATABASE_NAME.firebaseio.com"
         };
 
         // Initialize Firebase
@@ -569,14 +573,12 @@
         const auth = firebase.auth();
         const db = firebase.firestore();
         const storage = firebase.storage();
-        const realtimeDb = firebase.database(); // For real-time chat updates
+        const realtimeDb = firebase.database();
 
         // Data collections
         const usersRef = db.collection('users');
         const announcementsRef = db.collection('announcements');
         const filesRef = db.collection('files');
-
-        // For chat, use Realtime Database for real-time syncing
         const chatRef = realtimeDb.ref('chatMessages');
 
         // Current user and section
@@ -586,24 +588,36 @@
 
         // Listen for auth state changes
         auth.onAuthStateChanged(async (user) => {
+            console.log('Auth state changed:', user ? 'User logged in' : 'No user');
             if (user) {
-                // Fetch user data from Firestore
-                const userDoc = await usersRef.doc(user.uid).get();
-                if (userDoc.exists) {
-                    currentUser = { id: user.uid, ...userDoc.data() };
-                    if (currentUser.status === 'approved') {
-                        await updateUserOnlineStatus(true);
-                        showDashboard();
-                    } else if (currentUser.status === 'pending') {
-                        showPendingScreen();
+                console.log('Fetching user data for UID:', user.uid);
+                try {
+                    const userDoc = await usersRef.doc(user.uid).get();
+                    if (userDoc.exists) {
+                        currentUser = { id: user.uid, ...userDoc.data() };
+                        console.log('User data:', currentUser);
+                        if (currentUser.status === 'approved') {
+                            await updateUserOnlineStatus(true);
+                            showDashboard();
+                        } else if (currentUser.status === 'pending') {
+                            showPendingScreen();
+                        } else {
+                            console.log('User not approved or banned:', currentUser.status);
+                            alert('Your account is not approved or banned.');
+                            logout();
+                        }
                     } else {
-                        alert('Your account is not approved or banned.');
+                        console.error('User document not found in Firestore');
+                        alert('User data not found. Please sign up again.');
                         logout();
                     }
-                } else {
+                } catch (error) {
+                    console.error('Error fetching user data:', error);
+                    alert('Error loading user data: ' + error.message);
                     logout();
                 }
             } else {
+                console.log('Showing auth container');
                 showAuthContainer();
             }
         });
@@ -612,11 +626,15 @@
         function showSignup() {
             document.getElementById('loginForm').classList.add('hidden');
             document.getElementById('signupForm').classList.remove('hidden');
+            document.getElementById('loginError').classList.add('hidden');
+            document.getElementById('signupError').classList.add('hidden');
         }
 
         function showLogin() {
             document.getElementById('signupForm').classList.add('hidden');
             document.getElementById('loginForm').classList.remove('hidden');
+            document.getElementById('loginError').classList.add('hidden');
+            document.getElementById('signupError').classList.add('hidden');
         }
 
         function showAuthContainer() {
@@ -627,16 +645,40 @@
         }
 
         async function login(email, password) {
+            const loginButton = document.getElementById('loginButton');
+            const loginSpinner = document.getElementById('loginSpinner');
+            const loginError = document.getElementById('loginError');
+            
+            loginButton.disabled = true;
+            loginSpinner.classList.remove('hidden');
+            loginError.classList.add('hidden');
+
             try {
+                console.log('Attempting login with email:', email);
                 const credential = await auth.signInWithEmailAndPassword(email, password);
-                // onAuthStateChanged will handle the rest
+                console.log('Login successful, user:', credential.user.uid);
+                // onAuthStateChanged will handle UI transition
             } catch (error) {
-                alert(error.message);
+                console.error('Login error:', error.code, error.message);
+                loginError.textContent = getFriendlyErrorMessage(error.code);
+                loginError.classList.remove('hidden');
+            } finally {
+                loginButton.disabled = false;
+                loginSpinner.classList.add('hidden');
             }
         }
 
         async function signup(name, email, password) {
+            const signupButton = document.getElementById('signupButton');
+            const signupSpinner = document.getElementById('signupSpinner');
+            const signupError = document.getElementById('signupError');
+            
+            signupButton.disabled = true;
+            signupSpinner.classList.remove('hidden');
+            signupError.classList.add('hidden');
+
             try {
+                console.log('Attempting signup with email:', email);
                 const credential = await auth.createUserWithEmailAndPassword(email, password);
                 const newUser = {
                     name: name.trim(),
@@ -647,9 +689,15 @@
                     isOnline: false
                 };
                 await usersRef.doc(credential.user.uid).set(newUser);
-                // onAuthStateChanged will handle showing pending screen
+                console.log('Signup successful, user:', credential.user.uid);
+                // onAuthStateChanged will show pending screen
             } catch (error) {
-                alert(error.message);
+                console.error('Signup error:', error.code, error.message);
+                signupError.textContent = getFriendlyErrorMessage(error.code);
+                signupError.classList.remove('hidden');
+            } finally {
+                signupButton.disabled = false;
+                signupSpinner.classList.add('hidden');
             }
         }
 
@@ -658,6 +706,7 @@
                 await updateUserOnlineStatus(false);
             }
             await auth.signOut();
+            console.log('User logged out');
             showAuthContainer();
         }
 
@@ -681,6 +730,27 @@
             if (currentUser) {
                 await usersRef.doc(currentUser.id).update({ isOnline });
                 currentUser.isOnline = isOnline;
+                console.log('User online status updated:', isOnline);
+            }
+        }
+
+        // Error message mapping
+        function getFriendlyErrorMessage(errorCode) {
+            switch (errorCode) {
+                case 'auth/invalid-email':
+                    return 'Invalid email format.';
+                case 'auth/user-not-found':
+                    return 'No account found with this email.';
+                case 'auth/wrong-password':
+                    return 'Incorrect password.';
+                case 'auth/email-already-in-use':
+                    return 'This email is already registered.';
+                case 'auth/weak-password':
+                    return 'Password is too weak. Use at least 6 characters.';
+                case 'auth/invalid-credential':
+                    return 'Invalid credentials. Please check your email and password.';
+                default:
+                    return 'An error occurred. Please try again.';
             }
         }
 
@@ -708,12 +778,10 @@
         }
 
         function showSection(section) {
-            // Hide all sections
             document.querySelectorAll('[id$="Section"]').forEach(el => {
                 el.classList.add('hidden');
             });
             
-            // Show selected section if user has permission
             if (section === 'admin' && !['owner', 'admin'].includes(currentUser.role)) {
                 alert('Access denied: Admin section is restricted to owners and admins only.');
                 return;
@@ -722,7 +790,6 @@
             document.getElementById(section + 'Section').classList.remove('hidden');
             currentSection = section;
             
-            // Update sidebar active state
             document.querySelectorAll('.sidebar-item').forEach(item => {
                 item.classList.remove('bg-purple-100', 'text-purple-700');
                 if (item.querySelector('span').textContent.toLowerCase().includes(section)) {
@@ -739,7 +806,7 @@
                     await loadAnnouncements();
                     break;
                 case 'chat':
-                    await loadChat(); // Initial load, real-time listener is separate
+                    await loadChat();
                     await loadOnlineUsers();
                     break;
                 case 'files':
@@ -829,7 +896,7 @@
 
         // Chat functions
         async function loadChat() {
-            // Initial load not needed since we have real-time listener
+            // Initial load handled by real-time listener
         }
 
         function listenForChatUpdates() {
@@ -1084,7 +1151,6 @@
             document.getElementById('approvedMembers').textContent = approved;
             document.getElementById('bannedMembers').textContent = banned;
 
-            // Update notification badges
             const pendingBadge = document.getElementById('pendingCount');
             if (pending > 0) {
                 pendingBadge.textContent = pending;
@@ -1262,8 +1328,6 @@
             }
             
             if (confirm(`Are you sure you want to reset the password for ${user.name}?`)) {
-                // Firebase Auth doesn't allow admin password reset from client-side for security.
-                // In real app, use Firebase Admin SDK on server. For now, alert that it's not implemented client-side.
                 alert('Password reset not implemented client-side for security. Use Firebase console or server-side.');
             }
         }
@@ -1292,7 +1356,6 @@
             }
             
             if (confirm(`Are you sure you want to permanently remove ${user.name}'s account? This action cannot be undone.`)) {
-                // Delete user from Auth (requires server-side for security, but simulate)
                 alert('User deletion from Auth not implemented client-side. Delete from Firestore only.');
                 await usersRef.doc(userId).delete();
                 updateAdminStats();
@@ -1322,7 +1385,6 @@
             
             if (confirm('Are you sure you want to reject this user? This action cannot be undone.')) {
                 await usersRef.doc(userId).delete();
-                // Also delete from Auth if needed, but client-side limited
                 updateAdminStats();
                 loadPendingApprovals();
                 loadManageMembers();
@@ -1471,7 +1533,6 @@
                     
                     const tabName = this.dataset.tab;
                     
-                    // Update tab styles
                     document.querySelectorAll('.admin-tab').forEach(t => {
                         t.classList.remove('border-purple-500', 'text-purple-600');
                         t.classList.add('border-transparent', 'text-gray-500');
@@ -1479,7 +1540,6 @@
                     this.classList.add('border-purple-500', 'text-purple-600');
                     this.classList.remove('border-transparent', 'text-gray-500');
                     
-                    // Show/hide tab content
                     document.querySelectorAll('.admin-tab-content').forEach(content => {
                         content.classList.add('hidden');
                     });
@@ -1527,41 +1587,3 @@
 
             document.getElementById('fileUploadForm').addEventListener('submit', async function(e) {
                 e.preventDefault();
-                if (!['owner', 'admin'].includes(currentUser.role)) {
-                    alert('Only owners and admins can upload files.');
-                    return;
-                }
-                const fileInput = document.getElementById('fileInput');
-                const description = document.getElementById('fileDescription').value;
-                await uploadFile(fileInput, description);
-                document.getElementById('fileUploadModal').classList.add('hidden');
-                this.reset();
-            });
-
-            // Close modals when clicking outside
-            document.addEventListener('click', function(e) {
-                if (e.target.classList.contains('fixed')) {
-                    e.target.classList.add('hidden');
-                }
-            });
-
-            // Initialize default owner if not exists
-            (async () => {
-                const snapshot = await usersRef.where('email', '==', adminEmail).get();
-                if (snapshot.empty) {
-                    // Create owner account (assume password is set separately)
-                    const owner = {
-                        name: 'doksh',
-                        email: adminEmail,
-                        role: 'owner',
-                        status: 'approved',
-                        joinDate: firebase.firestore.Timestamp.now(),
-                        isOnline: false
-                    };
-                    await usersRef.add(owner);
-                }
-            })();
-        });
-    </script>
-</body>
-</html>
