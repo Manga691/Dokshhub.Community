@@ -545,63 +545,68 @@
         </div>
     </div>
 
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-storage.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database.js"></script>
+
     <script>
-        // Data storage
-        let currentUser = JSON.parse(localStorage.getItem('dokshhub_currentUser')) || null;
-        let users = JSON.parse(localStorage.getItem('dokshhub_users') || '[]');
-        let announcements = JSON.parse(localStorage.getItem('dokshhub_announcements') || '[]');
-        let chatMessages = JSON.parse(localStorage.getItem('dokshhub_chat') || '[]');
-        let files = JSON.parse(localStorage.getItem('dokshhub_files') || '[]');
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID",
+            databaseURL: "https://YOUR_DATABASE_NAME.firebaseio.com" // For Realtime Database if using for chat
+        };
+
+        // Initialize Firebase
+        const app = firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        const storage = firebase.storage();
+        const realtimeDb = firebase.database(); // For real-time chat updates
+
+        // Data collections
+        const usersRef = db.collection('users');
+        const announcementsRef = db.collection('announcements');
+        const filesRef = db.collection('files');
+
+        // For chat, use Realtime Database for real-time syncing
+        const chatRef = realtimeDb.ref('chatMessages');
+
+        // Current user and section
+        let currentUser = null;
         let currentSection = 'announcements';
         const adminEmail = 'Nashar1@dokshhub.com';
 
-        // Initialize default admin user
-        if (!users.some(u => u.email === adminEmail)) {
-            users = users.filter(u => u.role !== 'owner'); // Remove any existing owners
-            users.push({
-                id: 1,
-                name: 'doksh',
-                email: adminEmail,
-                password: '11221',
-                role: 'owner',
-                status: 'approved',
-                joinDate: new Date().toISOString(),
-                isOnline: false
-            });
-            localStorage.setItem('dokshhub_users', JSON.stringify(users));
-        }
-
-        // Check for logged-in user on page load
-        function initializePage() {
-            currentUser = JSON.parse(localStorage.getItem('dokshhub_currentUser')) || null;
-            console.log('Initializing page, currentUser:', currentUser);
-
-            if (currentUser) {
-                // Verify the user still exists in the users array and is valid
-                const user = users.find(u => u.id === currentUser.id && u.email.toLowerCase() === currentUser.email.toLowerCase());
-                if (user && user.status === 'approved') {
-                    currentUser = user; // Sync with latest user data
-                    currentUser.isOnline = true;
-                    updateUser(currentUser);
-                    localStorage.setItem('dokshhub_currentUser', JSON.stringify(currentUser));
-                    console.log('User is approved, showing dashboard');
-                    showDashboard();
-                } else if (user && user.status === 'pending') {
-                    currentUser = user;
-                    console.log('User is pending, showing pending screen');
-                    showPendingScreen();
+        // Listen for auth state changes
+        auth.onAuthStateChanged(async (user) => {
+            if (user) {
+                // Fetch user data from Firestore
+                const userDoc = await usersRef.doc(user.uid).get();
+                if (userDoc.exists) {
+                    currentUser = { id: user.uid, ...userDoc.data() };
+                    if (currentUser.status === 'approved') {
+                        await updateUserOnlineStatus(true);
+                        showDashboard();
+                    } else if (currentUser.status === 'pending') {
+                        showPendingScreen();
+                    } else {
+                        alert('Your account is not approved or banned.');
+                        logout();
+                    }
                 } else {
-                    // User no longer exists or is invalid, clear session
-                    console.warn('Invalid or deleted user, clearing session');
-                    localStorage.removeItem('dokshhub_currentUser');
-                    currentUser = null;
-                    showAuthContainer();
+                    logout();
                 }
             } else {
-                console.log('No currentUser found, showing auth container');
                 showAuthContainer();
             }
-        }
+        });
 
         // Auth functions
         function showSignup() {
@@ -621,92 +626,39 @@
             document.getElementById('navbar').classList.add('hidden');
         }
 
-        function login(email, password) {
-            // Normalize email to lowercase for case-insensitive comparison
-            email = email.toLowerCase().trim();
-            
-            // Find user in the users array
-            const user = users.find(u => u.email.toLowerCase() === email && u.password === password);
-            
-            if (!user) {
-                console.error('Login failed: Invalid email or password');
-                alert('Invalid email or password. Please check your credentials and try again.');
-                return;
-            }
-
-            if (user.status === 'banned') {
-                console.error('Login failed: Account is banned');
-                alert('Your account has been banned. Please contact an administrator.');
-                return;
-            }
-
-            if (user.status === 'pending') {
-                currentUser = user;
-                localStorage.setItem('dokshhub_currentUser', JSON.stringify(currentUser));
-                console.log('Login: User is pending, showing pending screen');
-                showPendingScreen();
-                return;
-            }
-
-            if (user.status === 'approved') {
-                currentUser = user;
-                currentUser.isOnline = true;
-                updateUser(currentUser);
-                localStorage.setItem('dokshhub_currentUser', JSON.stringify(currentUser));
-                console.log('Login successful: Showing dashboard for', currentUser.name);
-                showDashboard();
-                return;
-            }
-
-            console.error('Login failed: Unknown account status');
-            alert('Account status unknown. Please contact an administrator.');
-        }
-
-        function signup(name, email, password) {
-            email = email.toLowerCase().trim();
-            if (users.find(u => u.email.toLowerCase() === email)) {
-                console.error('Signup failed: Email already exists', email);
-                alert('An account with this email already exists.');
-                return;
-            }
-
-            const newUser = {
-                id: Date.now(),
-                name: name.trim(),
-                email: email,
-                password: password,
-                role: 'member',
-                status: 'pending',
-                joinDate: new Date().toISOString(),
-                isOnline: false
-            };
-
-            users.push(newUser);
+        async function login(email, password) {
             try {
-                localStorage.setItem('dokshhub_users', JSON.stringify(users));
-                currentUser = newUser;
-                localStorage.setItem('dokshhub_currentUser', JSON.stringify(currentUser));
-                console.log('Signup successful, user pending:', newUser);
-                showPendingScreen();
-            } catch (e) {
-                console.error('Failed to save signup data to localStorage:', e);
-                alert('Error creating account. Please try again.');
+                const credential = await auth.signInWithEmailAndPassword(email, password);
+                // onAuthStateChanged will handle the rest
+            } catch (error) {
+                alert(error.message);
             }
         }
 
-        function logout() {
-            if (currentUser) {
-                currentUser.isOnline = false;
-                updateUser(currentUser);
-                localStorage.removeItem('dokshhub_currentUser');
+        async function signup(name, email, password) {
+            try {
+                const credential = await auth.createUserWithEmailAndPassword(email, password);
+                const newUser = {
+                    name: name.trim(),
+                    email: email,
+                    role: 'member',
+                    status: 'pending',
+                    joinDate: firebase.firestore.Timestamp.now(),
+                    isOnline: false
+                };
+                await usersRef.doc(credential.user.uid).set(newUser);
+                // onAuthStateChanged will handle showing pending screen
+            } catch (error) {
+                alert(error.message);
             }
-            currentUser = null;
-            
+        }
+
+        async function logout() {
+            if (currentUser) {
+                await updateUserOnlineStatus(false);
+            }
+            await auth.signOut();
             showAuthContainer();
-            
-            // Reset forms
-            document.getElementById('loginFormElement').reset();
-            document.getElementById('signupFormElement').reset();
         }
 
         function showPendingScreen() {
@@ -725,17 +677,10 @@
             initializeDashboard();
         }
 
-        function updateUser(user) {
-            const index = users.findIndex(u => u.id === user.id);
-            if (index !== -1) {
-                users[index] = user;
-                try {
-                    localStorage.setItem('dokshhub_users', JSON.stringify(users));
-                    console.log('User updated and saved to localStorage:', user);
-                } catch (e) {
-                    console.error('Failed to save users to localStorage:', e);
-                    alert('Error saving user data. Please try again.');
-                }
+        async function updateUserOnlineStatus(isOnline) {
+            if (currentUser) {
+                await usersRef.doc(currentUser.id).update({ isOnline });
+                currentUser.isOnline = isOnline;
             }
         }
 
@@ -758,7 +703,8 @@
             
             loadContent();
             updateAdminStats();
-            startChatPolling();
+            listenForChatUpdates();
+            listenForOnlineUsers();
         }
 
         function showSection(section) {
@@ -787,32 +733,34 @@
             loadContent();
         }
 
-        function loadContent() {
+        async function loadContent() {
             switch (currentSection) {
                 case 'announcements':
-                    loadAnnouncements();
+                    await loadAnnouncements();
                     break;
                 case 'chat':
-                    loadChat();
-                    loadOnlineUsers();
+                    await loadChat(); // Initial load, real-time listener is separate
+                    await loadOnlineUsers();
                     break;
                 case 'files':
-                    loadFiles();
+                    await loadFiles();
                     break;
                 case 'members':
-                    loadMembers();
+                    await loadMembers();
                     break;
                 case 'admin':
                     if (['owner', 'admin'].includes(currentUser.role)) {
-                        loadAdminPanel();
+                        await loadAdminPanel();
                     }
                     break;
             }
         }
 
         // Announcements functions
-        function loadAnnouncements() {
+        async function loadAnnouncements() {
             const container = document.getElementById('announcementsList');
+            const snapshot = await announcementsRef.orderBy('date', 'desc').get();
+            const announcements = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             
             if (announcements.length === 0) {
                 container.innerHTML = `
@@ -836,11 +784,11 @@
                             </div>
                             <div>
                                 <h3 class="font-semibold text-white text-lg">${announcement.title}</h3>
-                                <p class="text-purple-100 text-sm">By ${announcement.author} • ${formatDate(announcement.date)}</p>
+                                <p class="text-purple-100 text-sm">By ${announcement.author} • ${formatDate(announcement.date.toDate())}</p>
                             </div>
                         </div>
                         ${['owner', 'admin'].includes(currentUser.role) ? `
-                            <button onclick="deleteAnnouncement(${announcement.id})" class="text-white/70 hover:text-white">
+                            <button onclick="deleteAnnouncement('${announcement.id}')" class="text-white/70 hover:text-white">
                                 <i class="fas fa-trash"></i>
                             </button>
                         ` : ''}
@@ -850,79 +798,91 @@
             `).join('');
         }
 
-        function createAnnouncement(title, content) {
+        async function createAnnouncement(title, content) {
             if (!['owner', 'admin', 'mod'].includes(currentUser.role)) {
                 alert('Only owners, admins and mods can create announcements.');
                 return;
             }
             
             const announcement = {
-                id: Date.now(),
-                title: title,
-                content: content,
+                title,
+                content,
                 author: currentUser.name,
-                date: new Date().toISOString()
+                date: firebase.firestore.Timestamp.now()
             };
 
-            announcements.unshift(announcement);
-            localStorage.setItem('dokshhub_announcements', JSON.stringify(announcements));
+            await announcementsRef.add(announcement);
             loadAnnouncements();
         }
 
-        function deleteAnnouncement(id) {
+        async function deleteAnnouncement(id) {
             if (!['owner', 'admin'].includes(currentUser.role)) {
                 alert('Only owners and admins can delete announcements.');
                 return;
             }
             
             if (confirm('Are you sure you want to delete this announcement?')) {
-                announcements = announcements.filter(a => a.id !== id);
-                localStorage.setItem('dokshhub_announcements', JSON.stringify(announcements));
+                await announcementsRef.doc(id).delete();
                 loadAnnouncements();
             }
         }
 
         // Chat functions
-        function loadChat() {
-            const container = document.getElementById('chatMessages');
-            
-            if (chatMessages.length === 0) {
-                container.innerHTML = `
-                    <div class="text-center py-12">
-                        <div class="mx-auto w-24 h-24 bg-blue-100 rounded-full flex items-center justify-center mb-4">
-                            <img src="https://storage.googleapis.com/workspace-0f70711f-8b4e-4d94-86f1-2a93ccde5887/image/e4cf7366-0840-447e-b482-46a4c8ce631f.png" alt="Empty chat room with speech bubble icons in blue and white minimalist design" />
-                        </div>
-                        <h3 class="text-lg font-medium text-gray-800 mb-2">Start the conversation!</h3>
-                        <p class="text-gray-600">Be the first to send a message to the community.</p>
-                    </div>
-                `;
-                return;
-            }
-
-            container.innerHTML = chatMessages.map(message => `
-                <div class="chat-message flex items-start space-x-3 ${message.userId === currentUser.id ? 'flex-row-reverse space-x-reverse' : ''}">
-                    <div class="w-8 h-8 ${message.userId === currentUser.id ? 'bg-purple-500' : 'bg-blue-500'} rounded-full flex items-center justify-center">
-                        <span class="text-white text-xs font-semibold">${message.author.charAt(0).toUpperCase()}</span>
-                    </div>
-                    <div class="flex-1 max-w-xs lg:max-w-md">
-                        <div class="${message.userId === currentUser.id ? 'bg-purple-500 text-white' : 'bg-white border border-gray-200'} rounded-lg p-3">
-                            <p class="text-sm font-medium ${message.userId === currentUser.id ? 'text-purple-100' : 'text-gray-700'} mb-1">${message.author}</p>
-                            <div class="${message.userId === currentUser.id ? 'text-white' : 'text-gray-800'}" style="word-break: break-word;">${message.content}</div>
-                            ${message.image ? `<img src="${message.image}" alt="Chat image" class="chat-image">` : ''}
-                        </div>
-                        <p class="text-xs text-gray-500 mt-1 ${message.userId === currentUser.id ? 'text-right' : ''}">${formatTime(message.timestamp)}
-                            ${['owner', 'admin'].includes(currentUser.role) ? ` <button onclick="deleteChatMessage(${message.id})" class="text-red-500 hover:text-red-700 ml-2"><i class="fas fa-trash"></i></button>` : ''}
-                        </p>
-                    </div>
-                </div>
-            `).join('');
-            
-            container.scrollTop = container.scrollHeight;
+        async function loadChat() {
+            // Initial load not needed since we have real-time listener
         }
 
-        function loadOnlineUsers() {
+        function listenForChatUpdates() {
+            chatRef.orderByChild('timestamp').on('value', (snapshot) => {
+                const container = document.getElementById('chatMessages');
+                const messages = [];
+                snapshot.forEach((child) => {
+                    messages.push({ id: child.key, ...child.val() });
+                });
+                
+                if (messages.length === 0) {
+                    container.innerHTML = `
+                        <div class="text-center py-12">
+                            <div class="mx-auto w-24 h-24 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+                                <img src="https://storage.googleapis.com/workspace-0f70711f-8b4e-4d94-86f1-2a93ccde5887/image/e4cf7366-0840-447e-b482-46a4c8ce631f.png" alt="Empty chat room with speech bubble icons in blue and white minimalist design" />
+                            </div>
+                            <h3 class="text-lg font-medium text-gray-800 mb-2">Start the conversation!</h3>
+                            <p class="text-gray-600">Be the first to send a message to the community.</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                container.innerHTML = messages.map(message => `
+                    <div class="chat-message flex items-start space-x-3 ${message.userId === currentUser.id ? 'flex-row-reverse space-x-reverse' : ''}">
+                        <div class="w-8 h-8 ${message.userId === currentUser.id ? 'bg-purple-500' : 'bg-blue-500'} rounded-full flex items-center justify-center">
+                            <span class="text-white text-xs font-semibold">${message.author.charAt(0).toUpperCase()}</span>
+                        </div>
+                        <div class="flex-1 max-w-xs lg:max-w-md">
+                            <div class="${message.userId === currentUser.id ? 'bg-purple-500 text-white' : 'bg-white border border-gray-200'} rounded-lg p-3">
+                                <p class="text-sm font-medium ${message.userId === currentUser.id ? 'text-purple-100' : 'text-gray-700'} mb-1">${message.author}</p>
+                                <div class="${message.userId === currentUser.id ? 'text-white' : 'text-gray-800'}" style="word-break: break-word;">${message.content}</div>
+                                ${message.image ? `<img src="${message.image}" alt="Chat image" class="chat-image">` : ''}
+                            </div>
+                            <p class="text-xs text-gray-500 mt-1 ${message.userId === currentUser.id ? 'text-right' : ''}">${formatTime(new Date(message.timestamp))}
+                                ${['owner', 'admin'].includes(currentUser.role) ? ` <button onclick="deleteChatMessage('${message.id}')" class="text-red-500 hover:text-red-700 ml-2"><i class="fas fa-trash"></i></button>` : ''}
+                            </p>
+                        </div>
+                    </div>
+                `).join('');
+                
+                container.scrollTop = container.scrollHeight;
+            });
+        }
+
+        function listenForOnlineUsers() {
+            usersRef.where('isOnline', '==', true).where('status', '==', 'approved').onSnapshot((snapshot) => {
+                loadOnlineUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            });
+        }
+
+        function loadOnlineUsers(onlineUsers) {
             const container = document.getElementById('onlineUsers');
-            const onlineUsers = users.filter(u => u.isOnline && u.status === 'approved');
             
             container.innerHTML = onlineUsers.map(user => `
                 <div class="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-50">
@@ -944,51 +904,35 @@
             return content.replace(/@(\w+)/g, '<span class="mention">@$1</span>');
         }
 
-        function sendChatMessage(content, imageData = null) {
+        async function sendChatMessage(content, imageData = null) {
             content = processMentions(content);
             const message = {
-                id: Date.now(),
-                content: content,
+                content,
                 author: currentUser.name,
                 userId: currentUser.id,
-                timestamp: new Date().toISOString(),
+                timestamp: Date.now(),
                 image: imageData
             };
 
-            chatMessages.push(message);
-            localStorage.setItem('dokshhub_chat', JSON.stringify(chatMessages));
-            loadChat();
+            await chatRef.push(message);
         }
 
-        function deleteChatMessage(id) {
+        async function deleteChatMessage(id) {
             if (!['owner', 'admin'].includes(currentUser.role)) {
                 alert('Only owners and admins can delete chat messages.');
                 return;
             }
             
             if (confirm('Are you sure you want to delete this message?')) {
-                chatMessages = chatMessages.filter(m => m.id !== id);
-                localStorage.setItem('dokshhub_chat', JSON.stringify(chatMessages));
-                loadChat();
+                await chatRef.child(id).remove();
             }
         }
 
-        function startChatPolling() {
-            // Simulate real-time updates by checking for new messages every 2 seconds
-            setInterval(() => {
-                if (currentSection === 'chat') {
-                    const stored = JSON.parse(localStorage.getItem('dokshhub_chat') || '[]');
-                    if (stored.length !== chatMessages.length) {
-                        chatMessages = stored;
-                        loadChat();
-                    }
-                }
-            }, 2000);
-        }
-
         // Files functions
-        function loadFiles() {
+        async function loadFiles() {
             const container = document.getElementById('filesList');
+            const snapshot = await filesRef.orderBy('uploadDate', 'desc').get();
+            const files = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             
             if (files.length === 0) {
                 container.innerHTML = `
@@ -1012,15 +956,15 @@
                         <div>
                             <h4 class="font-medium text-gray-800">${file.name}</h4>
                             <p class="text-sm text-gray-600">${file.description || 'No description'}</p>
-                            <p class="text-xs text-gray-500">Uploaded by ${file.uploader} • ${formatDate(file.uploadDate)}</p>
+                            <p class="text-xs text-gray-500">Uploaded by ${file.uploader} • ${formatDate(file.uploadDate.toDate())}</p>
                         </div>
                     </div>
                     <div class="flex items-center space-x-2">
-                        <button onclick="downloadFile(${file.id})" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm">
+                        <a href="${file.url}" download class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm">
                             <i class="fas fa-download mr-2"></i>Download
-                        </button>
+                        </a>
                         ${['owner', 'admin'].includes(currentUser.role) ? `
-                            <button onclick="deleteFile(${file.id})" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm">
+                            <button onclick="deleteFile('${file.id}', '${file.storagePath}')" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm">
                                 <i class="fas fa-trash"></i>
                             </button>
                         ` : ''}
@@ -1029,7 +973,7 @@
             `).join('');
         }
 
-        function uploadFile(fileInput, description) {
+        async function uploadFile(fileInput, description) {
             if (!['owner', 'admin'].includes(currentUser.role)) {
                 alert('Only owners and admins can upload files.');
                 return;
@@ -1038,37 +982,34 @@
             const file = fileInput.files[0];
             if (!file) return;
 
+            const storagePath = `files/${Date.now()}_${file.name}`;
+            const fileRef = storage.ref(storagePath);
+            await fileRef.put(file);
+            const url = await fileRef.getDownloadURL();
+
             const fileObj = {
-                id: Date.now(),
                 name: file.name,
-                description: description,
+                description,
                 uploader: currentUser.name,
-                uploadDate: new Date().toISOString(),
-                size: file.size
+                uploadDate: firebase.firestore.Timestamp.now(),
+                size: file.size,
+                url,
+                storagePath
             };
 
-            files.push(fileObj);
-            localStorage.setItem('dokshhub_files', JSON.stringify(files));
+            await filesRef.add(fileObj);
             loadFiles();
         }
 
-        function downloadFile(id) {
-            const file = files.find(f => f.id === id);
-            if (file) {
-                alert(`Downloading ${file.name}...`);
-                // In a real application, this would trigger an actual download
-            }
-        }
-
-        function deleteFile(id) {
+        async function deleteFile(id, storagePath) {
             if (!['owner', 'admin'].includes(currentUser.role)) {
                 alert('Only owners and admins can delete files.');
                 return;
             }
             
             if (confirm('Are you sure you want to delete this file?')) {
-                files = files.filter(f => f.id !== id);
-                localStorage.setItem('dokshhub_files', JSON.stringify(files));
+                await storage.ref(storagePath).delete();
+                await filesRef.doc(id).delete();
                 loadFiles();
             }
         }
@@ -1081,12 +1022,13 @@
             return 3;
         }
 
-        function loadMembers() {
+        async function loadMembers() {
             const container = document.getElementById('membersList');
-            let approvedMembers = users.filter(u => u.status === 'approved');
-            approvedMembers.sort((a, b) => rolePriority(a.role) - rolePriority(b.role));
+            const snapshot = await usersRef.where('status', '==', 'approved').get();
+            let members = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            members.sort((a, b) => rolePriority(a.role) - rolePriority(b.role));
             
-            container.innerHTML = approvedMembers.map(member => `
+            container.innerHTML = members.map(member => `
                 <div class="member-card bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                     <div class="flex items-center space-x-4 mb-4">
                         <div class="relative">
@@ -1103,7 +1045,7 @@
                     </div>
                     <div class="border-t border-gray-200 pt-4">
                         <div class="flex justify-between text-sm text-gray-600">
-                            <span>Joined: ${formatDate(member.joinDate)}</span>
+                            <span>Joined: ${formatDate(member.joinDate.toDate())}</span>
                             <span class="${member.isOnline ? 'text-green-600' : 'text-gray-500'}">${member.isOnline ? 'Online' : 'Offline'}</span>
                         </div>
                     </div>
@@ -1112,23 +1054,30 @@
         }
 
         // Admin functions
-        function loadAdminPanel() {
+        async function loadAdminPanel() {
             if (!['owner', 'admin'].includes(currentUser.role)) {
                 alert('Access denied: Admin panel is restricted to owners and admins only.');
                 document.getElementById('adminSection').classList.add('hidden');
                 return;
             }
             
-            updateAdminStats();
-            loadPendingApprovals();
-            loadManageMembers();
+            await updateAdminStats();
+            await loadPendingApprovals();
+            await loadManageMembers();
         }
 
-        function updateAdminStats() {
-            const total = users.length;
-            const pending = users.filter(u => u.status === 'pending').length;
-            const approved = users.filter(u => u.status === 'approved').length;
-            const banned = users.filter(u => u.status === 'banned').length;
+        async function updateAdminStats() {
+            const totalSnapshot = await usersRef.get();
+            const total = totalSnapshot.size;
+            
+            const pendingSnapshot = await usersRef.where('status', '==', 'pending').get();
+            const pending = pendingSnapshot.size;
+            
+            const approvedSnapshot = await usersRef.where('status', '==', 'approved').get();
+            const approved = approvedSnapshot.size;
+            
+            const bannedSnapshot = await usersRef.where('status', '==', 'banned').get();
+            const banned = bannedSnapshot.size;
 
             document.getElementById('totalMembers').textContent = total;
             document.getElementById('pendingMembers').textContent = pending;
@@ -1145,9 +1094,10 @@
             }
         }
 
-        function loadPendingApprovals() {
+        async function loadPendingApprovals() {
             const container = document.getElementById('pendingApprovals');
-            const pendingUsers = users.filter(u => u.status === 'pending');
+            const snapshot = await usersRef.where('status', '==', 'pending').get();
+            const pendingUsers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             
             if (pendingUsers.length === 0) {
                 container.innerHTML = `
@@ -1171,14 +1121,14 @@
                         <div>
                             <h4 class="font-medium text-gray-800">${user.name}</h4>
                             <p class="text-sm text-gray-600">${user.email}</p>
-                            <p class="text-xs text-gray-500">Requested: ${formatDate(user.joinDate)}</p>
+                            <p class="text-xs text-gray-500">Requested: ${formatDate(user.joinDate.toDate())}</p>
                         </div>
                     </div>
                     <div class="flex space-x-2">
-                        <button onclick="approveUser(${user.id})" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm">
+                        <button onclick="approveUser('${user.id}')" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm">
                             <i class="fas fa-check mr-2"></i>Approve
                         </button>
-                        <button onclick="rejectUser(${user.id})" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm">
+                        <button onclick="rejectUser('${user.id}')" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm">
                             <i class="fas fa-times mr-2"></i>Reject
                         </button>
                     </div>
@@ -1186,9 +1136,10 @@
             `).join('');
         }
 
-        function loadManageMembers() {
+        async function loadManageMembers() {
             const container = document.getElementById('manageMembersList');
-            const allMembers = users.filter(u => u.id !== currentUser.id); // Exclude current user
+            const snapshot = await usersRef.where('email', '!=', currentUser.email).get();
+            const allMembers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             
             container.innerHTML = allMembers.map(user => `
                 <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg mb-4">
@@ -1207,7 +1158,7 @@
                     </div>
                     <div class="flex space-x-2">
                         ${user.status === 'approved' && currentUser.role === 'owner' && user.role !== 'owner' ? `
-                            <select onchange="assignRoleToUser(${user.id}, this.value)" class="px-4 py-2 border border-gray-300 rounded-lg">
+                            <select onchange="assignRoleToUser('${user.id}', this.value)" class="px-4 py-2 border border-gray-300 rounded-lg">
                                 <option value="">Grant Role</option>
                                 <option value="admin">Admin</option>
                                 <option value="mod">Mod</option>
@@ -1215,15 +1166,15 @@
                             </select>
                         ` : ''}
                         ${user.status === 'approved' ? `
-                            <button onclick="banUser(${user.id})" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm">
+                            <button onclick="banUser('${user.id}')" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm">
                                 <i class="fas fa-ban mr-2"></i>Ban
                             </button>
                         ` : user.status === 'banned' ? `
-                            <button onclick="unbanUser(${user.id})" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm">
+                            <button onclick="unbanUser('${user.id}')" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm">
                                 <i class="fas fa-check mr-2"></i>Unban
                             </button>
                         ` : ''}
-                        <button onclick="removeUser(${user.id})" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-sm">
+                        <button onclick="removeUser('${user.id}')" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-sm">
                             <i class="fas fa-trash-alt mr-2"></i>Remove
                         </button>
                     </div>
@@ -1231,7 +1182,7 @@
             `).join('');
         }
 
-        function assignRoleToUser(userId, role) {
+        async function assignRoleToUser(userId, role) {
             if (currentUser.role !== 'owner') {
                 alert('Only owners can assign roles.');
                 return;
@@ -1239,18 +1190,14 @@
             
             if (role === '') return;
             
-            const user = users.find(u => u.id === userId);
-            if (user) {
-                if (confirm(`Are you sure you want to assign ${role} role to ${user.name}?`)) {
-                    user.role = role;
-                    updateUser(user);
-                    loadManageMembers();
-                    loadMembers();
-                }
+            if (confirm(`Are you sure you want to assign ${role} role to this user?`)) {
+                await usersRef.doc(userId).update({ role });
+                loadManageMembers();
+                loadMembers();
             }
         }
 
-        function assignRole() {
+        async function assignRole() {
             if (currentUser.role !== 'owner') {
                 alert('Only owners can assign roles.');
                 return;
@@ -1264,12 +1211,14 @@
                 return;
             }
             
-            const user = users.find(u => u.name.toLowerCase() === username.toLowerCase());
-            
-            if (!user) {
+            const snapshot = await usersRef.where('name', '==', username).get();
+            if (snapshot.empty) {
                 alert('User not found.');
                 return;
             }
+            
+            const userDoc = snapshot.docs[0];
+            const user = userDoc.data();
             
             if (user.status !== 'approved') {
                 alert('Only approved members can be assigned roles.');
@@ -1277,15 +1226,14 @@
             }
             
             if (confirm(`Are you sure you want to assign ${role} role to ${user.name}?`)) {
-                user.role = role;
-                updateUser(user);
+                await usersRef.doc(userDoc.id).update({ role });
                 document.getElementById('roleUsernameInput').value = '';
                 loadManageMembers();
                 loadMembers();
             }
         }
 
-        function resetUserPassword() {
+        async function resetUserPassword() {
             if (!['owner', 'admin'].includes(currentUser.role)) {
                 alert('Only owners and admins can reset passwords.');
                 return;
@@ -1299,53 +1247,54 @@
                 return;
             }
             
-            const user = users.find(u => u.name.toLowerCase() === username.toLowerCase());
-            
-            if (!user) {
+            const snapshot = await usersRef.where('name', '==', username).get();
+            if (snapshot.empty) {
                 alert('User not found.');
                 return;
             }
             
-            if (user.id === currentUser.id) {
+            const userDoc = snapshot.docs[0];
+            const user = userDoc.data();
+            
+            if (userDoc.id === currentUser.id) {
                 alert('You cannot reset your own password through this panel.');
                 return;
             }
             
             if (confirm(`Are you sure you want to reset the password for ${user.name}?`)) {
-                user.password = newPassword;
-                updateUser(user);
-                document.getElementById('resetUsernameInput').value = '';
-                document.getElementById('newPasswordInput').value = '';
-                alert(`Password for ${user.name} has been reset to: ${newPassword}`);
-                loadManageMembers();
+                // Firebase Auth doesn't allow admin password reset from client-side for security.
+                // In real app, use Firebase Admin SDK on server. For now, alert that it's not implemented client-side.
+                alert('Password reset not implemented client-side for security. Use Firebase console or server-side.');
             }
         }
 
-        function removeUser(userId) {
+        async function removeUser(userId) {
             if (!['owner', 'admin'].includes(currentUser.role)) {
                 alert('Only owners and admins can remove accounts.');
                 return;
             }
             
-            const user = users.find(u => u.id === userId);
-            if (!user) {
+            const userDoc = await usersRef.doc(userId).get();
+            if (!userDoc.exists) {
                 alert('User not found.');
                 return;
             }
             
+            const user = userDoc.data();
             if (user.email === adminEmail) {
                 alert('The main owner account cannot be removed.');
                 return;
             }
             
-            if (user.id === currentUser.id) {
+            if (userId === currentUser.id) {
                 alert('You cannot remove your own account.');
                 return;
             }
             
             if (confirm(`Are you sure you want to permanently remove ${user.name}'s account? This action cannot be undone.`)) {
-                users = users.filter(u => u.id !== userId);
-                localStorage.setItem('dokshhub_users', JSON.stringify(users));
+                // Delete user from Auth (requires server-side for security, but simulate)
+                alert('User deletion from Auth not implemented client-side. Delete from Firestore only.');
+                await usersRef.doc(userId).delete();
                 updateAdminStats();
                 loadPendingApprovals();
                 loadManageMembers();
@@ -1353,104 +1302,75 @@
             }
         }
 
-        function approveUser(userId) {
+        async function approveUser(userId) {
             if (!['owner', 'admin'].includes(currentUser.role)) {
                 alert('Only owners and admins can approve users.');
                 return;
             }
             
-            const user = users.find(u => u.id === userId);
-            if (user) {
-                user.status = 'approved';
-                updateUser(user);
-                if (user.id === currentUser.id) {
-                    currentUser = user;
-                    localStorage.setItem('dokshhub_currentUser', JSON.stringify(currentUser));
-                    showDashboard();
-                }
-                updateAdminStats();
-                loadPendingApprovals();
-                loadManageMembers();
-            }
+            await usersRef.doc(userId).update({ status: 'approved' });
+            updateAdminStats();
+            loadPendingApprovals();
+            loadManageMembers();
         }
 
-        function rejectUser(userId) {
+        async function rejectUser(userId) {
             if (!['owner', 'admin'].includes(currentUser.role)) {
                 alert('Only owners and admins can reject users.');
                 return;
             }
             
             if (confirm('Are you sure you want to reject this user? This action cannot be undone.')) {
-                const user = users.find(u => u.id === userId);
-                if (user && user.id === currentUser.id) {
-                    localStorage.removeItem('dokshhub_currentUser');
-                    currentUser = null;
-                }
-                users = users.filter(u => u.id !== userId);
-                localStorage.setItem('dokshhub_users', JSON.stringify(users));
+                await usersRef.doc(userId).delete();
+                // Also delete from Auth if needed, but client-side limited
                 updateAdminStats();
                 loadPendingApprovals();
                 loadManageMembers();
-                if (!currentUser) {
-                    showAuthContainer();
-                }
             }
         }
 
-        function banUser(userId) {
+        async function banUser(userId) {
             if (!['owner', 'admin'].includes(currentUser.role)) {
                 alert('Only owners and admins can ban users.');
                 return;
             }
             
-            const user = users.find(u => u.id === userId);
-            if (user && user.email === adminEmail) {
+            const userDoc = await usersRef.doc(userId).get();
+            const user = userDoc.data();
+            if (user.email === adminEmail) {
                 alert('The main owner account cannot be banned.');
                 return;
             }
             
             if (confirm('Are you sure you want to ban this user?')) {
-                if (user) {
-                    user.status = 'banned';
-                    user.isOnline = false;
-                    updateUser(user);
-                    if (user.id === currentUser.id) {
-                        localStorage.removeItem('dokshhub_currentUser');
-                        currentUser = null;
-                        showAuthContainer();
-                    }
-                    updateAdminStats();
-                    loadManageMembers();
-                }
-            }
-        }
-
-        function unbanUser(userId) {
-            if (!['owner', 'admin'].includes(currentUser.role)) {
-                alert('Only owners and admins can unban users.');
-                return;
-            }
-            
-            const user = users.find(u => u.id === userId);
-            if (user) {
-                user.status = 'approved';
-                updateUser(user);
+                await usersRef.doc(userId).update({ status: 'banned', isOnline: false });
                 updateAdminStats();
                 loadManageMembers();
             }
         }
 
+        async function unbanUser(userId) {
+            if (!['owner', 'admin'].includes(currentUser.role)) {
+                alert('Only owners and admins can unban users.');
+                return;
+            }
+            
+            await usersRef.doc(userId).update({ status: 'approved' });
+            updateAdminStats();
+            loadManageMembers();
+        }
+
         // Utility functions
-        function formatDate(dateString) {
-            return new Date(dateString).toLocaleDateString('en-US', {
+        function formatDate(date) {
+            return date.toLocaleDateString('en-US', {
                 year: 'numeric',
                 month: 'short',
                 day: 'numeric'
             });
         }
 
-        function formatTime(dateString) {
-            return new Date(dateString).toLocaleTimeString('en-US', {
+        function formatTime(date) {
+            return date.toLocaleTimeString('en-US', {
                 hour: '2-digit',
                 minute: '2-digit'
             });
@@ -1476,28 +1396,25 @@
 
         // Event listeners
         document.addEventListener('DOMContentLoaded', function() {
-            // Initialize page based on currentUser
-            initializePage();
-
             // Auth form toggles
             document.getElementById('showSignup').addEventListener('click', showSignup);
             document.getElementById('showLogin').addEventListener('click', showLogin);
 
             // Login form
-            document.getElementById('loginFormElement').addEventListener('submit', function(e) {
+            document.getElementById('loginFormElement').addEventListener('submit', async function(e) {
                 e.preventDefault();
                 const email = document.getElementById('loginEmail').value;
                 const password = document.getElementById('loginPassword').value;
-                login(email, password);
+                await login(email, password);
             });
 
             // Signup form
-            document.getElementById('signupFormElement').addEventListener('submit', function(e) {
+            document.getElementById('signupFormElement').addEventListener('submit', async function(e) {
                 e.preventDefault();
                 const name = document.getElementById('signupName').value;
                 const email = document.getElementById('signupEmail').value;
                 const password = document.getElementById('signupPassword').value;
-                signup(name, email, password);
+                await signup(name, email, password);
             });
 
             // Logout buttons
@@ -1524,25 +1441,23 @@
 
             document.getElementById('chatImageInput').addEventListener('change', sendChat);
 
-            function sendChat() {
+            async function sendChat() {
                 const input = document.getElementById('chatInput');
                 const content = input.value.trim();
                 const fileInput = document.getElementById('chatImageInput');
                 const file = fileInput.files[0];
 
                 if (content || file) {
+                    let imageData = null;
                     if (file) {
-                        const reader = new FileReader();
-                        reader.onload = function(e) {
-                            sendChatMessage(content, e.target.result);
-                            input.value = '';
-                            fileInput.value = '';
-                        };
-                        reader.readAsDataURL(file);
-                    } else {
-                        sendChatMessage(content);
-                        input.value = '';
+                        const storagePath = `chat_images/${Date.now()}_${file.name}`;
+                        const fileRef = storage.ref(storagePath);
+                        await fileRef.put(file);
+                        imageData = await fileRef.getDownloadURL();
                     }
+                    await sendChatMessage(content, imageData);
+                    input.value = '';
+                    fileInput.value = '';
                 }
             }
 
@@ -1585,7 +1500,7 @@
                 document.getElementById('announcementModal').classList.add('hidden');
             });
 
-            document.getElementById('announcementForm').addEventListener('submit', function(e) {
+            document.getElementById('announcementForm').addEventListener('submit', async function(e) {
                 e.preventDefault();
                 if (!['owner', 'admin', 'mod'].includes(currentUser.role)) {
                     alert('Only owners, admins and mods can create announcements.');
@@ -1593,7 +1508,7 @@
                 }
                 const title = document.getElementById('announcementTitle').value;
                 const content = document.getElementById('announcementContent').value;
-                createAnnouncement(title, content);
+                await createAnnouncement(title, content);
                 document.getElementById('announcementModal').classList.add('hidden');
                 this.reset();
             });
@@ -1610,7 +1525,7 @@
                 document.getElementById('fileUploadModal').classList.add('hidden');
             });
 
-            document.getElementById('fileUploadForm').addEventListener('submit', function(e) {
+            document.getElementById('fileUploadForm').addEventListener('submit', async function(e) {
                 e.preventDefault();
                 if (!['owner', 'admin'].includes(currentUser.role)) {
                     alert('Only owners and admins can upload files.');
@@ -1618,7 +1533,7 @@
                 }
                 const fileInput = document.getElementById('fileInput');
                 const description = document.getElementById('fileDescription').value;
-                uploadFile(fileInput, description);
+                await uploadFile(fileInput, description);
                 document.getElementById('fileUploadModal').classList.add('hidden');
                 this.reset();
             });
@@ -1629,6 +1544,23 @@
                     e.target.classList.add('hidden');
                 }
             });
+
+            // Initialize default owner if not exists
+            (async () => {
+                const snapshot = await usersRef.where('email', '==', adminEmail).get();
+                if (snapshot.empty) {
+                    // Create owner account (assume password is set separately)
+                    const owner = {
+                        name: 'doksh',
+                        email: adminEmail,
+                        role: 'owner',
+                        status: 'approved',
+                        joinDate: firebase.firestore.Timestamp.now(),
+                        isOnline: false
+                    };
+                    await usersRef.add(owner);
+                }
+            })();
         });
     </script>
 </body>
